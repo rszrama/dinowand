@@ -1,0 +1,4725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dino Wand</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%232d4a2c'/%3E%3Ccircle cx='8' cy='8' r='5' fill='%23ffd24a'/%3E%3C/svg%3E" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a2a1a;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: #f4f0e4;
+      user-select: none;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #crosshair {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair::before, #crosshair::after {
+      content: "";
+      position: absolute;
+      background: #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.45);
+    }
+    #crosshair::before {
+      left: 50%; top: 3px; bottom: 3px; width: 2px; margin-left: -1px;
+    }
+    #crosshair::after {
+      top: 50%; left: 3px; right: 3px; height: 2px; margin-top: -1px;
+    }
+    #stats {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      font-size: 20px;
+      line-height: 1.45;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 0 10px rgba(0,0,0,0.4);
+      font-weight: 700;
+    }
+    #stats .coin { color: #ffd24a; }
+    #stats .dino { color: #b6f59a; }
+    #safe-hint {
+      margin-top: 5px;
+      font-size: 13px;
+      letter-spacing: 0.07em;
+      color: #9ad8ff;
+      font-weight: 700;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 0 8px rgba(80,160,220,0.4);
+      opacity: 0.92;
+    }
+    #safe-hint.hidden { display: none; }
+    #hearts {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      margin: 0 0 6px 1px;
+      min-height: 22px;
+    }
+    .hud-heart {
+      width: 16px;
+      height: 16px;
+      position: relative;
+      transform: rotate(-45deg);
+      background: #e02430;
+      box-shadow: 1px 1px 0 rgba(0,0,0,0.35);
+      flex: 0 0 16px;
+    }
+    .hud-heart::before,
+    .hud-heart::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #e02430;
+      border-radius: 50%;
+    }
+    .hud-heart::before { top: -8px; left: 0; }
+    .hud-heart::after { top: 0; left: 8px; }
+    .hud-heart.empty,
+    .hud-heart.empty::before,
+    .hud-heart.empty::after {
+      background: rgba(80, 16, 18, 0.55);
+      box-shadow: none;
+    }
+    #hearts.flicker .hud-heart:not(.empty) {
+      animation: heartFlicker 0.16s steps(1) infinite;
+    }
+    #hearts.flicker .hud-heart:not(.empty)::before,
+    #hearts.flicker .hud-heart:not(.empty)::after {
+      animation: heartFlicker 0.16s steps(1) infinite;
+    }
+    @keyframes heartFlicker {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0.2; }
+    }
+    #hurt-flash {
+      position: fixed;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(160,0,0,0.05) 20%, rgba(150,0,10,0.58) 100%);
+      opacity: 0;
+      transition: opacity 0.09s linear;
+    }
+    #hurt-flash.show { opacity: 1; }
+    #hurt-flash.hidden { display: none; }
+    #hint {
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.8);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 16, 10, 0.62);
+      backdrop-filter: blur(3px);
+    }
+    .overlay.hidden { display: none; }
+    .panel {
+      width: min(460px, calc(100% - 40px));
+      padding: 36px 32px 28px;
+      text-align: center;
+      background: linear-gradient(180deg, #2d4a2c 0%, #1d301c 100%);
+      border: 3px solid #e2c36a;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(255,255,255,0.06);
+    }
+    .panel h1 {
+      font-size: 42px;
+      letter-spacing: 0.12em;
+      color: #ffe58a;
+      text-shadow: 0 3px 0 #6a4a10;
+      margin-bottom: 6px;
+    }
+    .panel .tag {
+      color: #c8e8b4;
+      font-size: 14px;
+      margin-bottom: 22px;
+      letter-spacing: 0.04em;
+    }
+    .panel p, .panel li {
+      font-size: 15px;
+      line-height: 1.5;
+      color: #f0ead8;
+    }
+    .controls {
+      text-align: left;
+      list-style: none;
+      margin: 0 auto 24px;
+      display: grid;
+      gap: 6px;
+    }
+    .controls li span {
+      display: inline-block;
+      min-width: 86px;
+      color: #ffd24a;
+      font-weight: 700;
+    }
+    .panel .death-title {
+      font-size: 34px;
+      color: #ff8a7a;
+      letter-spacing: 0.06em;
+      text-shadow: 0 3px 0 #5a1810;
+      margin-bottom: 10px;
+    }
+    .panel .scoreline {
+      font-size: 20px;
+      margin: 8px 0 22px;
+      color: #ffe58a;
+    }
+    button {
+      cursor: pointer;
+      pointer-events: auto;
+      border: 0;
+      padding: 12px 28px;
+      font: 700 16px/1 "Trebuchet MS", "Segoe UI", sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #2a1c08;
+      background: #ffd24a;
+      box-shadow: 0 4px 0 #a67c18;
+    }
+    button:hover { background: #ffe58a; }
+    button:active { transform: translateY(2px); box-shadow: 0 2px 0 #a67c18; }
+    .mode-row, .action-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .mode-row { margin: 0 0 14px; }
+    .action-row { margin-top: 4px; }
+    .action-row .mode-row { margin: 0; }
+    .mode-btn {
+      background: #2a3c28;
+      color: #f0ead8;
+      box-shadow: 0 4px 0 #152016;
+      padding: 10px 18px;
+      font-size: 14px;
+    }
+    .mode-btn:hover { background: #3a5440; color: #fff; }
+    .mode-btn.active {
+      background: #ffd24a;
+      color: #2a1c08;
+      box-shadow: 0 4px 0 #a67c18;
+    }
+    .mode-btn.active:hover { background: #ffe58a; color: #2a1c08; }
+    #mode-badge {
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 0 10px rgba(0,0,0,0.4);
+    }
+    #mode-badge[data-mode="easy"] { color: #8fe8a8; }
+    #mode-badge[data-mode="hard"] { color: #ff9a5c; }
+    #wand-bar {
+      position: absolute;
+      left: 50%;
+      bottom: 44px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+    }
+    .wand-slot {
+      position: relative;
+      width: 92px;
+      padding: 8px 6px 7px;
+      text-align: center;
+      background: rgba(10, 16, 12, 0.62);
+      border: 2px solid rgba(255,255,255,0.18);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    .wand-slot .key {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.7);
+    }
+    .wand-slot .name {
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 1px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    }
+    .wand-slot .price {
+      font-size: 11px;
+      color: #ffd24a;
+      margin-top: 2px;
+      font-weight: 700;
+    }
+    .wand-slot.locked {
+      filter: grayscale(1) brightness(0.72);
+      opacity: 0.72;
+    }
+    .wand-slot.locked .name { color: #c8c8c8; }
+    .wand-slot.unlocked .price { display: none; }
+    .wand-slot[data-slot="1"] .name { color: #d7b4ff; }
+    .wand-slot[data-slot="2"] .name { color: #ff9a5c; }
+    .wand-slot[data-slot="3"] .name { color: #7be7ff; }
+    .wand-slot.active {
+      border-color: #ffe58a;
+      background: rgba(40, 48, 18, 0.78);
+      box-shadow: 0 0 0 1px rgba(255,229,138,0.35), 0 2px 0 rgba(0,0,0,0.35);
+    }
+    .wand-slot .cd-fill {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 0%;
+      background: rgba(255, 90, 30, 0.45);
+      pointer-events: none;
+    }
+    #cooldown-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 48px;
+      height: 48px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0;
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+      mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+    }
+    #toast, #interact-prompt {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    #toast {
+      top: 22%;
+      font-size: 20px;
+      color: #ffe58a;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+    #toast.show { opacity: 1; }
+    #interact-prompt {
+      bottom: 132px;
+      font-size: 16px;
+      color: #f4f0e4;
+      background: rgba(8,14,10,0.55);
+      padding: 6px 14px;
+      border: 1px solid rgba(255,229,138,0.35);
+    }
+    #interact-prompt.hidden { display: none; }
+    #interact-prompt.short { color: #ffb0a0; }
+    .wand-slot[data-slot="4"] .name { color: #7dffb0; }
+    #boss-bar {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(440px, calc(100% - 260px));
+      text-align: center;
+      pointer-events: none;
+    }
+    #boss-bar.hidden { display: none; }
+    #boss-name {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: #ff9a8a;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      margin-bottom: 5px;
+    }
+    #boss-track {
+      height: 14px;
+      background: rgba(16, 8, 10, 0.78);
+      border: 2px solid #e2c36a;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    #boss-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #a8121a 0%, #ff4e2a 100%);
+      transition: width 0.08s linear;
+    }
+    #blood-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+    }
+    #blood-overlay.hidden { display: none; }
+    #blood-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #overlay-death {
+      background: rgba(38, 4, 6, 0.45);
+      transition: opacity 0.55s ease;
+    }
+    #overlay-death.fading { opacity: 0; }
+    .panel .victory-title {
+      font-size: 34px;
+      color: #ffe58a;
+      letter-spacing: 0.06em;
+      text-shadow: 0 3px 0 #5a420c;
+      margin-bottom: 10px;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hud" class="hidden-until-play">
+    <div id="crosshair"></div>
+    <div id="stats">
+      <div id="hearts" aria-label="Hearts"></div>
+      <div class="coin">Coins: <span id="coin-count">0</span></div>
+      <div class="dino">Dinos defeated: <span id="dino-count">0/25</span></div>
+      <div id="safe-hint" class="hidden">Safe while shopping</div>
+    </div>
+    <div id="mode-badge" data-mode="hard">Hard</div>
+    <div id="boss-bar" class="hidden">
+      <div id="boss-name">ANCIENT TYRANT</div>
+      <div id="boss-track"><div id="boss-fill"></div></div>
+    </div>
+    <div id="cooldown-ring"></div>
+    <div id="toast"></div>
+    <div id="interact-prompt" class="hidden"></div>
+    <div id="wand-bar">
+      <div class="wand-slot unlocked active" data-slot="1">
+        <div class="key">1</div>
+        <div class="name">Spark</div>
+        <div class="price"></div>
+        <div class="cd-fill"></div>
+      </div>
+      <div class="wand-slot locked" data-slot="2">
+        <div class="key">2</div>
+        <div class="name">Inferno</div>
+        <div class="price">15 coins</div>
+        <div class="cd-fill"></div>
+      </div>
+      <div class="wand-slot locked" data-slot="3">
+        <div class="key">3</div>
+        <div class="name">Tempest</div>
+        <div class="price">10 coins</div>
+        <div class="cd-fill"></div>
+      </div>
+      <div class="wand-slot locked" data-slot="4">
+        <div class="key">4</div>
+        <div class="name">Turret</div>
+        <div class="price">0 · 8c</div>
+        <div class="cd-fill"></div>
+      </div>
+    </div>
+    <div id="hint">WASD move · Shift run · 1–3 wands · 4 turret · E buy · Click shoot/place</div>
+  </div>
+
+  <div id="overlay-start" class="overlay">
+    <div class="panel">
+      <h1>DINO WAND</h1>
+      <div class="tag">A tiny low-poly romp</div>
+      <ul class="controls">
+        <li><span>WASD</span> Walk / strafe</li>
+        <li><span>Shift</span> Run</li>
+        <li><span>Mouse</span> Look around</li>
+        <li><span>Click</span> Shoot your wand</li>
+        <li><span>1 / 2 / 3</span> Switch wands</li>
+        <li><span>4</span> Select turret (click to place)</li>
+        <li><span>E</span> Buy from shrines or shops</li>
+      </ul>
+      <p style="margin-bottom:16px">Break crates for coins, visit shrines, the turret shop, and the healer for extra hearts. Defeat 25 dinos to summon the Tyrant!</p>
+      <div class="mode-row">
+        <button type="button" class="mode-btn" data-mode="easy">Easy</button>
+        <button type="button" class="mode-btn" data-mode="hard">Hard</button>
+      </div>
+      <button id="btn-start" type="button">Click to play</button>
+    </div>
+  </div>
+
+  <div id="hurt-flash" class="hidden"></div>
+  <div id="blood-overlay" class="hidden"><canvas id="blood-canvas"></canvas></div>
+
+  <div id="overlay-death" class="overlay hidden">
+    <div class="panel">
+      <div class="death-title">You were eaten!</div>
+      <div class="scoreline">Coins collected: <span id="death-coins">0</span></div>
+      <div class="scoreline" style="margin-top:0;margin-bottom:16px;color:#b6f59a">Dinos defeated: <span id="death-dinos">0</span></div>
+      <p style="margin-bottom:16px">The dinos got you. Try again?</p>
+      <div class="action-row">
+        <div class="mode-row">
+          <button type="button" class="mode-btn" data-mode="easy">Easy</button>
+          <button type="button" class="mode-btn" data-mode="hard">Hard</button>
+        </div>
+        <button id="btn-again" type="button">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-victory" class="overlay hidden">
+    <div class="panel">
+      <div class="victory-title">You defeated the Tyrant!</div>
+      <div class="scoreline" style="margin-bottom:8px">Coins collected: <span id="win-coins">0</span></div>
+      <div class="scoreline" style="margin-top:0;margin-bottom:8px;color:#b6f59a">Dinos defeated: <span id="win-dinos">0</span></div>
+      <div class="scoreline" style="margin-top:0;margin-bottom:16px;color:#c8e8b4">Time: <span id="win-time">0:00</span></div>
+      <div class="action-row">
+        <div class="mode-row">
+          <button type="button" class="mode-btn" data-mode="easy">Easy</button>
+          <button type="button" class="mode-btn" data-mode="hard">Hard</button>
+        </div>
+        <button id="btn-win-again" type="button">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+import * as THREE from "three";
+
+const SKY = 0x87c6e8;
+const WALK_SPEED = 5.4;
+const RUN_SPEED = 9.4;
+const PLAYER_RADIUS = 0.42;
+const PLAYER_EYE = 1.62;
+const WORLD_HALF = 48;
+const BOLT_SPEED = 32;
+const BOLT_LIFE = 1.15;
+const BOX_HITS = 1;
+const DINO_HP = 3;
+const DINO_EAT = 1.15;
+const DINO_WALK = 2.6;
+const DINO_HUNT = 5.6;
+const DINO_CHARGE_SPEED = 10.2;
+const DINO_SIGHT = 40;
+const DINO_FOV_HALF = (55 * Math.PI) / 180;
+const DINO_CLOSE_NOTICE = 3.6;
+const DINO_CHARGE_TURN = 1.55;
+const DINO_CHARGE_TIME = 4.6;
+const DINO_TELEGRAPH_MIN = 0.42;
+const DINO_TELEGRAPH_MAX = 0.58;
+const DINO_COOLDOWN = 1.15;
+const DINO_PACK_RADIUS = 20;
+const DINO_STAGGER = 0.28;
+const DINO_KNOCKBACK = 7.5;
+const MAX_DINOS = 6;
+const MAX_DINOS_BOSS = 3;
+const BOSS_KILLS_REQ = 25;
+const BOSS_HP = 30;
+const TURRET_PRICE = 8;
+const TURRET_RANGE = 30;
+const TURRET_FOV_HALF = (30 * Math.PI) / 180;
+const TURRET_FIRE_GAP = 0.6;
+const TURRET_HP = 2;
+const PTERA_UNLOCK = 10;
+const PTERA_MAX_EASY = 3;
+const PTERA_MAX_HARD = 2;
+const HEART_PRICE = 15;
+const HEART_MAX = 5;
+const HURT_INVULN = 1.5;
+const PTERA_HP = 2;
+const PTERA_RANGE = 28;
+const PTERA_ALT_MIN = 5.2;
+const PTERA_ALT_MAX = 15.5;
+const PTERA_CRUISE = 8.2;
+const PTERA_DIVE_SPEED = 24;
+const PTERA_DIVE_TURN = 1.35;
+const PTERA_TELEGRAPH = 0.5;
+const PTERA_COOLDOWN = 3.0;
+const PTERA_HIT_R = 1.25;
+const SPAWN_CLEAR = 8;
+const SHOP_NPC_RANGE = 3.6;
+const SHOP_SHRINE_RANGE = 3.4;
+const SHOP_LEAVE_GRACE = 0.5;
+const SAFE_TINT = 0x7ab8e8;
+
+const $ = (id) => document.getElementById(id);
+const overlayStart = $("overlay-start");
+const overlayDeath = $("overlay-death");
+const btnStart = $("btn-start");
+const btnAgain = $("btn-again");
+const btnWinAgain = $("btn-win-again");
+const overlayVictory = $("overlay-victory");
+const coinEl = $("coin-count");
+const dinoEl = $("dino-count");
+const heartsEl = $("hearts");
+const hurtFlashEl = $("hurt-flash");
+const deathCoinsEl = $("death-coins");
+const deathDinosEl = $("death-dinos");
+const winCoinsEl = $("win-coins");
+const winDinosEl = $("win-dinos");
+const winTimeEl = $("win-time");
+const bossBarEl = $("boss-bar");
+const bossFillEl = $("boss-fill");
+const bloodOverlay = $("blood-overlay");
+const bloodCanvas = $("blood-canvas");
+const hud = $("hud");
+const toastEl = $("toast");
+const promptEl = $("interact-prompt");
+const safeHintEl = $("safe-hint");
+const cooldownRing = $("cooldown-ring");
+const modeBadge = $("mode-badge");
+
+let difficulty = "hard";
+
+let state = "start"; // start | playing | paused | dead | victory
+let coins = 0;
+let coinsCollected = 0;
+let dinosDefeated = 0;
+let hearts = 1;
+let maxHearts = 1;
+let invulnUntil = 0;
+let hurtFlashUntil = 0;
+let playerKbX = 0;
+let playerKbZ = 0;
+let runTime = 0;
+let bossSpawned = false;
+let activeBoss = null;
+let turretStock = 0;
+let bloodAnim = null;
+let victoryAt = 0;
+let yaw = 0;
+let pitch = 0;
+let bobTime = 0;
+let wandRecoil = 0;
+let flashEnergy = 0;
+let shootLockUntil = 0;
+let time = 0;
+let dinoSpawnTimer = 14;
+let boxId = 0;
+
+const keys = Object.create(null);
+const colliders = [];
+const keepOuts = [];
+const houses = [];
+const trees = [];
+const crates = [];
+const coins3d = [];
+const dinos = [];
+const bolts = [];
+const particles = [];
+const shrines = [];
+const shrineMotes = [];
+const turrets = [];
+const pteras = [];
+let shopkeeper = null;
+let healer = null;
+let pterasUnlocked = false;
+let pteraSpawnTimer = 6;
+let shopSafe = false;
+let shopLeaveGraceUntil = 0;
+let bossPending = false;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 28, 72);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.08, 200);
+camera.rotation.order = "YXZ";
+camera.position.set(0, PLAYER_EYE, 8);
+scene.add(camera);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(SKY);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.prepend(renderer.domElement);
+
+const hemi = new THREE.HemisphereLight(0xe8f4ff, 0x5a7a3a, 0.72);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d0, 0.95);
+sun.position.set(30, 50, 18);
+scene.add(sun);
+const fill = new THREE.AmbientLight(0xffffff, 0.18);
+scene.add(fill);
+
+const muzzleLight = new THREE.PointLight(0xc6a0ff, 0, 8);
+muzzleLight.position.set(0.2, -0.1, -0.6);
+camera.add(muzzleLight);
+
+// --- audio (procedural, no assets) ---
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  }
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+}
+function beep(freq, dur, type, gain, slide) {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = type || "square";
+  osc.frequency.setValueAtTime(freq, t0);
+  if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, slide), t0 + dur);
+  g.gain.setValueAtTime(gain ?? 0.06, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+
+document.addEventListener("pointerdown", () => ensureAudio(), { capture: true });
+
+function shriekAt(d) {
+  ensureAudio();
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const dur = 0.62;
+  const dx = d.root.position.x - camera.position.x;
+  const dz = d.root.position.z - camera.position.z;
+  const dist = Math.hypot(dx, dz);
+  const vol = Math.max(0.018, 0.28 / (1 + dist * 0.07));
+  const p = d.isBoss ? 0.42 : (1 + (d.pitchVar || 0));
+  const durScale = d.isBoss ? 1.45 : 1;
+
+  function tone(type, startF, peakF, endF, peakT, gainMul) {
+    const dSec = dur * durScale;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(startF * p, t0);
+    osc.frequency.exponentialRampToValueAtTime(peakF * p, t0 + peakT * durScale);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(32, endF * p), t0 + dSec);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol * gainMul * (d.isBoss ? 1.35 : 1), t0 + 0.045);
+    g.gain.exponentialRampToValueAtTime(vol * gainMul * 0.45, t0 + 0.28 * durScale);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dSec);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dSec + 0.03);
+  }
+  tone("sawtooth", 280, 940, 150, 0.18, 1.0);
+  tone("square", 210, 760, 110, 0.16, 0.45);
+
+  const nLen = Math.floor(audioCtx.sampleRate * 0.38);
+  const buf = audioCtx.createBuffer(1, nLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < nLen; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const bp = audioCtx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.setValueAtTime(1500 * p, t0);
+  bp.frequency.exponentialRampToValueAtTime(780 * p, t0 + 0.36);
+  bp.Q.value = 2.4;
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(0.0001, t0);
+  ng.gain.exponentialRampToValueAtTime(vol * 0.8, t0 + 0.03);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.36);
+  src.connect(bp).connect(ng).connect(audioCtx.destination);
+  src.start(t0);
+  src.stop(t0 + 0.4);
+}
+
+function screechPtera(p) {
+  ensureAudio();
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const dur = 0.82;
+  const dx = p.root.position.x - camera.position.x;
+  const dy = p.root.position.y - camera.position.y;
+  const dz = p.root.position.z - camera.position.z;
+  const dist = Math.hypot(dx, dy, dz);
+  const vol = Math.max(0.02, 0.26 / (1 + dist * 0.06));
+  const detune = 0.9 + Math.random() * 0.22;
+
+  // high warbling square + triangle with fast vibrato / FM, descending glide
+  const osc = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  osc.type = "square";
+  osc2.type = "triangle";
+  const startF = 2600 * detune;
+  const endF = 980 * detune;
+  osc.frequency.setValueAtTime(startF, t0);
+  osc.frequency.exponentialRampToValueAtTime(endF, t0 + dur);
+  osc2.frequency.setValueAtTime(startF * 1.08, t0);
+  osc2.frequency.exponentialRampToValueAtTime(endF * 0.92, t0 + dur);
+
+  const lfo = audioCtx.createOscillator();
+  lfo.type = "sine";
+  lfo.frequency.setValueAtTime(18, t0);
+  lfo.frequency.linearRampToValueAtTime(12, t0 + dur);
+  const lfoGain = audioCtx.createGain();
+  lfoGain.gain.value = 140 * detune; // Hz vibrato
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc.frequency);
+  lfoGain.connect(osc2.frequency);
+
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.04);
+  g.gain.exponentialRampToValueAtTime(vol * 0.5, t0 + 0.35);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g);
+  osc2.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start(t0); osc2.start(t0); lfo.start(t0);
+  osc.stop(t0 + dur + 0.03);
+  osc2.stop(t0 + dur + 0.03);
+  lfo.stop(t0 + dur + 0.03);
+
+  // raspy highpassed noise
+  const nLen = Math.floor(audioCtx.sampleRate * dur);
+  const buf = audioCtx.createBuffer(1, nLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < nLen; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.setValueAtTime(1800, t0);
+  hp.frequency.exponentialRampToValueAtTime(900, t0 + dur);
+  hp.Q.value = 0.7;
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(0.0001, t0);
+  ng.gain.exponentialRampToValueAtTime(vol * 0.7, t0 + 0.03);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(hp).connect(ng).connect(audioCtx.destination);
+  src.start(t0);
+  src.stop(t0 + dur + 0.03);
+}
+
+function playBossStep(dist) {
+  if (!audioCtx) return;
+  const vol = Math.max(0.01, 0.18 / (1 + dist * 0.06));
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(92, t0);
+  osc.frequency.exponentialRampToValueAtTime(34, t0 + 0.18);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.22);
+}
+
+function playTurretCrunch(destroyed) {
+  ensureAudio();
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const dur = destroyed ? 0.34 : 0.16;
+  const nLen = Math.floor(audioCtx.sampleRate * dur);
+  const buf = audioCtx.createBuffer(1, nLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < nLen; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const bp = audioCtx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.setValueAtTime(destroyed ? 420 : 620, t0);
+  bp.Q.value = 1.6;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(destroyed ? 0.16 : 0.09, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(bp).connect(g).connect(audioCtx.destination);
+  src.start(t0);
+  src.stop(t0 + dur + 0.02);
+  beep(destroyed ? 110 : 190, dur * 0.8, "sawtooth", 0.06, 48);
+}
+
+// --- helpers ---
+function lambert(color, opts = {}) {
+  return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts });
+}
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a += 0x6d2b79f5;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = makeRng(0xd1a064);
+const randRange = (a, b) => a + rand() * (b - a);
+const randChoice = (arr) => arr[(rand() * arr.length) | 0];
+
+function groundTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#5b9a3a";
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 5000; i++) {
+    const g = 90 + ((Math.sin(i * 12.9) * 0.5 + 0.5) * 70) | 0;
+    const r = 50 + (i % 40);
+    const b = 30 + (i % 25);
+    ctx.fillStyle = `rgba(${r},${g},${b},${0.15 + (i % 7) * 0.05})`;
+    ctx.fillRect((i * 47) % 256, (i * 91) % 256, 2 + (i % 4), 2 + (i % 3));
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(24, 24);
+  tex.magFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Ground + edge
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(WORLD_HALF * 2 + 8, WORLD_HALF * 2 + 8),
+  new THREE.MeshLambertMaterial({ map: groundTexture() })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const rimMat = lambert(0x3e6e28);
+for (const [x, z, w, d] of [
+  [0, WORLD_HALF + 1.2, WORLD_HALF * 2 + 6, 2.4],
+  [0, -WORLD_HALF - 1.2, WORLD_HALF * 2 + 6, 2.4],
+  [WORLD_HALF + 1.2, 0, 2.4, WORLD_HALF * 2 + 6],
+  [-WORLD_HALF - 1.2, 0, 2.4, WORLD_HALF * 2 + 6],
+]) {
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 2.2, d), rimMat);
+  wall.position.set(x, 1.1, z);
+  scene.add(wall);
+}
+
+// Decorative low-poly clouds
+const cloudMat = lambert(0xf4f7ff);
+function addCloud(x, y, z, s) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(
+      (1.6 + i * 0.3) * s, (0.7 + (i % 2) * 0.3) * s, (1.1 + (3 - i) * 0.2) * s
+    ), cloudMat);
+    b.position.set((i - 1.5) * 0.9 * s, (i % 2) * 0.2 * s, ((i % 3) - 1) * 0.4 * s);
+    g.add(b);
+  }
+  g.position.set(x, y, z);
+  scene.add(g);
+}
+addCloud(-18, 22, -20, 2.4);
+addCloud(12, 24, -28, 2.0);
+addCloud(28, 21, 8, 1.7);
+addCloud(-30, 23, 14, 2.2);
+
+const sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(3.2, 10, 8),
+  new THREE.MeshBasicMaterial({ color: 0xfff1a8 })
+);
+sunMesh.position.copy(sun.position).setLength(60);
+scene.add(sunMesh);
+
+function addCollider(kind, x, z, hx, hz) {
+  const c = { kind, x, z, hx, hz };
+  colliders.push(c);
+  return c;
+}
+
+function overlaps(x, z, hx, hz, pad = 1.4) {
+  if (Math.hypot(x, z) < SPAWN_CLEAR) return true;
+  for (const c of keepOuts) {
+    if (Math.abs(x - c.x) < hx + c.hx + pad && Math.abs(z - c.z) < hz + c.hz + pad) return true;
+  }
+  for (const c of colliders) {
+    if (Math.abs(x - c.x) < hx + c.hx + pad && Math.abs(z - c.z) < hz + c.hz + pad) return true;
+  }
+  return Math.abs(x) > WORLD_HALF - 2 || Math.abs(z) > WORLD_HALF - 2;
+}
+
+function findSpot(hx, hz, maxTries = 80) {
+  for (let i = 0; i < maxTries; i++) {
+    const x = randRange(-WORLD_HALF + 6, WORLD_HALF - 6);
+    const z = randRange(-WORLD_HALF + 6, WORLD_HALF - 6);
+    if (!overlaps(x, z, hx, hz)) return { x, z };
+  }
+  return null;
+}
+
+// --- wands / shrines (placed first so houses and trees keep clear) ---
+const WAND_DEFS = [
+  {
+    id: 1, name: "Spark Wand", short: "Spark",
+    unlocked: true, price: 0,
+    fireGap: 0.16, damage: 1, splash: 0, splashDamage: 0,
+    speed: 32, life: 1.15, scale: 1,
+    spread: 0, color: 0xe8c6ff, light: 0xc090ff,
+  },
+  {
+    id: 2, name: "Inferno Wand", short: "Inferno",
+    unlocked: false, price: 15,
+    fireGap: 2.3, damage: 5, splash: 2.8, splashDamage: 2,
+    speed: 22, life: 1.55, scale: 1.85,
+    spread: 0, color: 0xff6a2a, light: 0xff5510,
+  },
+  {
+    id: 3, name: "Tempest Wand", short: "Tempest",
+    unlocked: false, price: 10,
+    fireGap: 0.38, damage: 1, splash: 0, splashDamage: 0,
+    speed: 30, life: 1.15, scale: 0.95,
+    spread: (9 * Math.PI) / 180, color: 0x7be7ff, light: 0x3ad4ff,
+  },
+];
+let activeWand = 1;
+let wandReadyAt = [0, 0, 0, 0];
+let switchAnim = 0;
+let toastTimer = 0;
+const wandModels = {};
+let wandRig = null;
+
+function makeLabelSprite(line1, line2, hex) {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 128;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, 256, 128);
+  ctx.font = "bold 28px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.strokeStyle = "rgba(0,0,0,0.75)";
+  ctx.lineWidth = 6;
+  ctx.fillStyle = hex;
+  ctx.strokeText(line1, 128, 40);
+  ctx.fillText(line1, 128, 40);
+  ctx.font = "bold 26px Trebuchet MS, sans-serif";
+  ctx.fillStyle = "#ffd24a";
+  ctx.strokeText(line2, 128, 86);
+  ctx.fillText(line2, 128, 86);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true }));
+  spr.scale.set(2.8, 1.4, 1);
+  return spr;
+}
+
+function createWandModel(kind) {
+  const wand = new THREE.Group();
+  let handle, band, shaft, crystal, crystalMat;
+  if (kind === 2) {
+    handle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.042, 0.055, 0.46, 7),
+      lambert(0x2a1a14)
+    );
+    handle.rotation.x = Math.PI / 2;
+    handle.position.z = 0.06;
+    wand.add(handle);
+    band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.055, 8),
+      lambert(0xc45a18)
+    );
+    band.rotation.x = Math.PI / 2;
+    band.position.z = -0.14;
+    wand.add(band);
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.035, 0.05), lambert(0x8a2a10));
+    guard.position.z = -0.14;
+    wand.add(guard);
+    shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.028, 0.042, 0.3, 7),
+      lambert(0x3a1c12)
+    );
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.z = -0.28;
+    wand.add(shaft);
+    crystalMat = new THREE.MeshStandardMaterial({
+      color: 0xff5a20,
+      emissive: 0xff3300,
+      emissiveIntensity: 1.15,
+      flatShading: true,
+      roughness: 0.3,
+      metalness: 0.15,
+    });
+    crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), crystalMat);
+    crystal.position.z = -0.5;
+    crystal.scale.set(0.85, 0.85, 1.7);
+    wand.add(crystal);
+  } else if (kind === 3) {
+    handle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.03, 0.4, 6),
+      lambert(0x2a3a44)
+    );
+    handle.rotation.x = Math.PI / 2;
+    handle.position.z = 0.08;
+    wand.add(handle);
+    band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.034, 0.034, 0.035, 8),
+      lambert(0xb8d8e8)
+    );
+    band.rotation.x = Math.PI / 2;
+    band.position.z = -0.12;
+    wand.add(band);
+    shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.014, 0.022, 0.26, 6),
+      lambert(0x1c2e38)
+    );
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.z = -0.24;
+    wand.add(shaft);
+    crystalMat = new THREE.MeshStandardMaterial({
+      color: 0x5ad8ff,
+      emissive: 0x1488ff,
+      emissiveIntensity: 1.05,
+      flatShading: true,
+      roughness: 0.28,
+      metalness: 0.2,
+    });
+    crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.055, 0), crystalMat);
+    crystal.position.z = -0.4;
+    crystal.scale.set(0.65, 0.65, 1.5);
+    wand.add(crystal);
+    for (const side of [-1, 1]) {
+      const prong = new THREE.Mesh(new THREE.OctahedronGeometry(0.036, 0), crystalMat);
+      prong.position.set(side * 0.055, 0, -0.38);
+      prong.scale.set(0.5, 0.5, 1.2);
+      prong.rotation.y = side * 0.4;
+      wand.add(prong);
+    }
+  } else {
+    handle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.028, 0.036, 0.42, 6),
+      lambert(0x5b3315)
+    );
+    handle.rotation.x = Math.PI / 2;
+    handle.position.z = 0.08;
+    wand.add(handle);
+    band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.038, 0.038, 0.04, 8),
+      lambert(0xd4b44a)
+    );
+    band.rotation.x = Math.PI / 2;
+    band.position.z = -0.12;
+    wand.add(band);
+    shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.026, 0.28, 6),
+      lambert(0x3a2414)
+    );
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.z = -0.22;
+    wand.add(shaft);
+    crystalMat = new THREE.MeshStandardMaterial({
+      color: 0xb07cff,
+      emissive: 0x6a2cff,
+      emissiveIntensity: 0.9,
+      flatShading: true,
+      roughness: 0.35,
+      metalness: 0.1,
+    });
+    crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), crystalMat);
+    crystal.position.z = -0.4;
+    crystal.scale.set(0.7, 0.7, 1.5);
+    wand.add(crystal);
+  }
+  wand.userData.crystal = crystal;
+  wand.userData.crystalMat = crystalMat;
+  wand.userData.baseEmissive = crystalMat.emissiveIntensity;
+  return wand;
+}
+
+function createInfernoShrine() {
+  const g = new THREE.Group();
+  const stone = lambert(0x8a8478);
+  const stoneDark = lambert(0x5e5850);
+  const verm = lambert(0xc4452a);
+  const vermDark = lambert(0x8a2818);
+  const roof = lambert(0xb83a22);
+
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.6, 0.28, 10), stone);
+  plat.position.y = 0.14;
+  g.add(plat);
+  const step = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.16, 10), stoneDark);
+  step.position.y = 0.3;
+  g.add(step);
+
+  // torii gate at the front (+Z)
+  for (const s of [-1.15, 1.15]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.6, 0.22), verm);
+    post.position.set(s, 1.5, 2.35);
+    g.add(post);
+  }
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.18, 0.28), verm);
+  lintel.position.set(0, 2.7, 2.35);
+  g.add(lintel);
+  const kasagi = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.14, 0.36), vermDark);
+  kasagi.position.set(0, 2.88, 2.35);
+  g.add(kasagi);
+  const nuki = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.1, 0.16), vermDark);
+  nuki.position.set(0, 2.15, 2.35);
+  g.add(nuki);
+
+  // pagoda behind the pedestal
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 1.8), stone);
+  base.position.set(0, 0.85, -0.55);
+  g.add(base);
+  const mid = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.85, 1.35), stoneDark);
+  mid.position.set(0, 1.8, -0.55);
+  g.add(mid);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.65, 0.95), stone);
+  top.position.set(0, 2.5, -0.55);
+  g.add(top);
+  const r1 = new THREE.Mesh(new THREE.ConeGeometry(1.55, 0.42, 4), roof);
+  r1.position.set(0, 1.5, -0.55);
+  r1.rotation.y = Math.PI / 4;
+  g.add(r1);
+  const r2 = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.36, 4), roof);
+  r2.position.set(0, 2.28, -0.55);
+  r2.rotation.y = Math.PI / 4;
+  g.add(r2);
+  const r3 = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.7, 4), roof);
+  r3.position.set(0, 3.05, -0.55);
+  r3.rotation.y = Math.PI / 4;
+  g.add(r3);
+  const finial = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffc080 }));
+  finial.position.set(0, 3.45, -0.55);
+  g.add(finial);
+
+  for (const s of [-1.4, 1.4]) {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.38, 0.28), new THREE.MeshLambertMaterial({
+      color: 0xffaa55, emissive: 0xff5510, emissiveIntensity: 0.8, flatShading: true,
+    }));
+    lamp.position.set(s, 0.95, 1.3);
+    g.add(lamp);
+  }
+
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.48, 0.7, 8), stoneDark);
+  ped.position.set(0, 0.7, 1.15);
+  g.add(ped);
+  return g;
+}
+
+function createTempestShrine() {
+  const g = new THREE.Group();
+  const stone = lambert(0x7a8894);
+  const stoneDark = lambert(0x4e5a66);
+  const crystalMat = new THREE.MeshStandardMaterial({
+    color: 0x66d8ff,
+    emissive: 0x1188cc,
+    emissiveIntensity: 0.9,
+    flatShading: true,
+    roughness: 0.25,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.92,
+  });
+
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.7, 0.26, 14), stone);
+  plat.position.y = 0.13;
+  g.add(plat);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(3.15, 3.15, 0.12, 16), stoneDark);
+  ring.position.y = 0.26;
+  g.add(ring);
+
+  const pillars = 8;
+  for (let i = 0; i < pillars; i++) {
+    const a = (i / pillars) * Math.PI * 2;
+    const px = Math.cos(a) * 2.85;
+    const pz = Math.sin(a) * 2.85;
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 2.15, 6), stone);
+    col.position.set(px, 1.2, pz);
+    g.add(col);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.16, 6), stoneDark);
+    cap.position.set(px, 2.3, pz);
+    g.add(cap);
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), crystalMat);
+    gem.position.set(px, 2.5, pz);
+    g.add(gem);
+  }
+
+  const obelisk = new THREE.Mesh(new THREE.ConeGeometry(0.42, 2.6, 5), crystalMat);
+  obelisk.position.set(0, 1.7, -0.35);
+  g.add(obelisk);
+  const obeliskCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshBasicMaterial({ color: 0xc4f6ff }));
+  obeliskCore.position.set(0, 2.55, -0.35);
+  g.add(obeliskCore);
+
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.48, 0.7, 10), stoneDark);
+  ped.position.set(0, 0.7, 1.15);
+  g.add(ped);
+  return g;
+}
+
+function spawnShrineMote(shrine) {
+  const color = shrine.kind === 2 ? 0xff6a2a : 0x5ad8ff;
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06, 5, 5),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
+  );
+  const a = Math.random() * Math.PI * 2;
+  const r = 0.25 + Math.random() * 0.7;
+  m.position.set(shrine.x + Math.cos(a) * r, 0.9 + Math.random() * 0.4, shrine.z + 1.15 + Math.sin(a) * r * 0.4);
+  scene.add(m);
+  shrineMotes.push({ mesh: m, life: 1.1 + Math.random() * 0.5, max: 1.4, vy: 0.55 + Math.random() * 0.35 });
+}
+
+function placeShrine(kind, targetX, targetZ) {
+  const hx = 3.4, hz = 3.4;
+  let x = targetX, z = targetZ;
+  if (overlaps(x, z, hx, hz, 1.0)) {
+    let found = false;
+    for (let i = 0; i < 80; i++) {
+      const tx = targetX + (Math.random() * 16 - 8);
+      const tz = targetZ + (Math.random() * 16 - 8);
+      if (!overlaps(tx, tz, hx, hz, 1.0) && Math.abs(tx) < WORLD_HALF - 8 && Math.abs(tz) < WORLD_HALF - 8) {
+        x = tx; z = tz; found = true; break;
+      }
+    }
+    if (!found) { x = targetX; z = targetZ; }
+  }
+  const group = kind === 2 ? createInfernoShrine() : createTempestShrine();
+  group.position.set(x, 0, z);
+  // face roughly toward the world origin so the approach is from the village
+  group.rotation.y = Math.atan2(x, z) + Math.PI;
+  scene.add(group);
+
+  const pedLocal = new THREE.Vector3(0, 0, 1.15);
+  pedLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), group.rotation.y);
+  const pedX = x + pedLocal.x;
+  const pedZ = z + pedLocal.z;
+
+  const display = createWandModel(kind);
+  display.scale.setScalar(1.7);
+  display.rotation.x = -Math.PI / 2;
+  display.position.set(pedX, 1.45, pedZ);
+  scene.add(display);
+
+  const light = new THREE.PointLight(kind === 2 ? 0xff5510 : 0x3ad4ff, 2.4, 11);
+  light.position.set(pedX, 1.7, pedZ);
+  scene.add(light);
+
+  const def = WAND_DEFS[kind - 1];
+  const label = makeLabelSprite(def.name, def.price + " coins", kind === 2 ? "#ff9a5c" : "#7be7ff");
+  label.position.set(pedX, 2.45, pedZ);
+  scene.add(label);
+
+  // keep houses/trees off the platform; structure colliders leave the approach walkable
+  keepOuts.push({ x, z, hx: 4.4, hz: 4.4 });
+  const face = group.rotation.y;
+  function localToWorld(lx, lz) {
+    return {
+      x: x + lx * Math.cos(face) + lz * Math.sin(face),
+      z: z - lx * Math.sin(face) + lz * Math.cos(face),
+    };
+  }
+  const core = localToWorld(0, -0.55);
+  addCollider("shrine", core.x, core.z, 1.15, 1.15);
+  if (kind === 2) {
+    for (const s of [-1.15, 1.15]) {
+      const p = localToWorld(s, 2.35);
+      addCollider("shrine", p.x, p.z, 0.22, 0.22);
+    }
+  } else {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const p = localToWorld(Math.cos(a) * 2.85, Math.sin(a) * 2.85);
+      addCollider("shrine", p.x, p.z, 0.22, 0.22);
+    }
+  }
+
+  const shrine = {
+    kind, name: def.name, price: def.price,
+    group, display, light, label,
+    x, z, pedX, pedZ,
+    bought: false,
+    moteT: 0,
+  };
+  shrines.push(shrine);
+  return shrine;
+}
+
+placeShrine(2, -34, -30);
+placeShrine(3, 34, 28);
+
+// --- houses ---
+const HOUSE_BODY = [0xf3e2c4, 0xf0d3b0, 0xe8d5c0, 0xf7ead2];
+const HOUSE_ROOF = [0xc45c3e, 0xa84b3a, 0xb45a2c, 0x8c3e32];
+
+function makeBannerTex(title, sub, theme = "turret") {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 96;
+  const ctx = c.getContext("2d");
+  const heart = theme === "heart";
+  ctx.fillStyle = heart ? "#5a1218" : "#4b2b18";
+  ctx.fillRect(0, 0, 256, 96);
+  ctx.strokeStyle = heart ? "#ff8a8a" : "#e2c36a";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(4, 4, 248, 88);
+  if (heart) {
+    // small red heart emblem on the left
+    ctx.save();
+    ctx.translate(28, 48);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = "#e02430";
+    ctx.fillRect(-7, -7, 14, 14);
+    ctx.beginPath(); ctx.arc(-7, 0, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -7, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  ctx.font = "bold 36px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = heart ? "#ffd0d4" : "#ffe58a";
+  ctx.fillText(title, heart ? 140 : 128, 36);
+  ctx.font = "bold 20px Trebuchet MS, sans-serif";
+  ctx.fillStyle = heart ? "#ffd24a" : "#7dffb0";
+  ctx.fillText(sub, heart ? 140 : 128, 70);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createShopkeeperModel() {
+  const g = new THREE.Group();
+  const coat = lambert(0x2a6a58);
+  const apron = lambert(0xdcc292);
+  const skin = lambert(0xf0c29a);
+  const hat = lambert(0x6b3a1c);
+  const trim = lambert(0xe2c36a);
+
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.55, 0.24), lambert(0x3a2a1e));
+  legs.position.y = 0.275;
+  g.add(legs);
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.66, 0.32), coat);
+  torso.position.y = 0.88;
+  g.add(torso);
+
+  const front = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.56, 0.06), apron);
+  front.position.set(0, 0.82, 0.17);
+  g.add(front);
+
+  for (const s of [-0.34, 0.34]) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.52, 0.16), coat);
+    arm.position.set(s, 0.86, 0.04);
+    g.add(arm);
+  }
+
+  const head = new THREE.Group();
+  head.position.set(0, 1.42, 0);
+  const skull = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), skin);
+  head.add(skull);
+  const eyeMat = lambert(0x1b1512);
+  for (const s of [-0.08, 0.08]) {
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.04), eyeMat);
+    eye.position.set(s, 0.03, 0.18);
+    head.add(eye);
+  }
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.05, 8), hat);
+  brim.position.y = 0.2;
+  head.add(brim);
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.22, 8), hat);
+  crown.position.y = 0.32;
+  head.add(crown);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.225, 0.225, 0.045, 8), trim);
+  band.position.y = 0.24;
+  head.add(band);
+  g.add(head);
+  g.userData.head = head;
+  return g;
+}
+
+function createHeartMesh(scale = 1, color = 0xe02430) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({
+    color, emissive: 0x801018, emissiveIntensity: 0.45, flatShading: true,
+  });
+  const l = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), mat);
+  l.position.set(-0.13, 0.1, 0);
+  const r = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), mat);
+  r.position.set(0.13, 0.1, 0);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.4, 5), mat);
+  tip.rotation.x = Math.PI;
+  tip.position.set(0, -0.16, 0);
+  g.add(l, r, tip);
+  g.scale.setScalar(scale);
+  return g;
+}
+
+function createHealerModel() {
+  const g = new THREE.Group();
+  const robe = lambert(0xf0e6d6);
+  const sash = lambert(0xc01e2a);
+  const skin = lambert(0xe8c4a4);
+  const hood = lambert(0x8e1c24);
+  const hair = lambert(0xc8c4bc);
+
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.52, 0.24), lambert(0xe8d8c4));
+  legs.position.y = 0.26;
+  g.add(legs);
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.34), robe);
+  torso.position.y = 0.9;
+  g.add(torso);
+
+  const stole = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, 0.08), sash);
+  stole.position.set(0, 0.88, 0.18);
+  g.add(stole);
+  const crossBar = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.07), sash);
+  crossBar.position.set(0, 1.08, 0.185);
+  g.add(crossBar);
+
+  for (const s of [-0.32, 0.32]) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.5, 0.15), robe);
+    arm.position.set(s, 0.88, 0.02);
+    g.add(arm);
+  }
+
+  const head = new THREE.Group();
+  head.position.set(0, 1.46, 0);
+  const skull = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), skin);
+  head.add(skull);
+  const bun = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), hair);
+  bun.position.set(0, 0.16, -0.14);
+  head.add(bun);
+  const eyeMat = lambert(0x1b1512);
+  for (const s of [-0.08, 0.08]) {
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.04), eyeMat);
+    eye.position.set(s, 0.03, 0.17);
+    head.add(eye);
+  }
+  const hoodM = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.42), hood);
+  hoodM.position.set(0, 0.2, -0.02);
+  head.add(hoodM);
+  const hoodBack = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.28, 0.12), hood);
+  hoodBack.position.set(0, 0.06, -0.2);
+  head.add(hoodBack);
+  g.add(head);
+  g.userData.head = head;
+
+  const held = createHeartMesh(0.45);
+  held.position.set(0.32, 0.7, 0.22);
+  held.rotation.z = 0.15;
+  g.add(held);
+  return g;
+}
+
+function createHouse(shopKind = null) {
+  const isShop = !!shopKind;
+  const w = isShop ? 4.6 : randRange(3.2, 5.2);
+  const d = isShop ? 4.2 : randRange(3.0, 4.8);
+  const h = isShop ? 3.1 : randRange(2.4, 3.3);
+  let pos = null;
+  if (shopKind === "turret") {
+    const cand = [-11, -7];
+    if (!overlaps(cand[0], cand[1], w / 2, d / 2, 1.6)) pos = { x: cand[0], z: cand[1] };
+    else pos = findSpot(w / 2 + 0.8, d / 2 + 0.8);
+  } else if (shopKind === "heart") {
+    const cand = [16, 14];
+    if (!overlaps(cand[0], cand[1], w / 2, d / 2, 1.6)) pos = { x: cand[0], z: cand[1] };
+    else pos = findSpot(w / 2 + 0.8, d / 2 + 0.8);
+  } else {
+    pos = findSpot(w / 2, d / 2);
+  }
+  if (!pos) return;
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    lambert(shopKind === "heart" ? 0xf7ebe6 : isShop ? 0xf2dfc0 : randChoice(HOUSE_BODY))
+  );
+  body.position.y = h / 2;
+  group.add(body);
+
+  const roofH = isShop ? 1.8 : randRange(1.3, 2.0);
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(Math.hypot(w, d) * 0.55, roofH, 4),
+    lambert(shopKind === "heart" ? 0xa42a32 : isShop ? 0x2f6e52 : randChoice(HOUSE_ROOF))
+  );
+  roof.position.y = h + roofH / 2 - 0.05;
+  roof.rotation.y = Math.PI / 4;
+  group.add(roof);
+
+  if (isShop) {
+    // open doorway recess facing +Z (south toward spawn!)
+    const fz = d / 2 + 0.02;
+    const recess = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.85, 0.14), lambert(0x16100c));
+    recess.position.set(0, 0.925, fz - 0.04);
+    group.add(recess);
+    const frameMat = lambert(0x5a321c);
+    for (const sx of [-0.62, 0.62]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.95, 0.16), frameMat);
+      post.position.set(sx, 0.975, fz + 0.02);
+      group.add(post);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.16, 0.2), frameMat);
+    lintel.position.set(0, 1.98, fz + 0.03);
+    group.add(lintel);
+
+    const awning = new THREE.Mesh(
+      new THREE.BoxGeometry(2.8, 0.1, 0.95),
+      lambert(shopKind === "heart" ? 0xf4e6e0 : 0xc4482e)
+    );
+    awning.position.set(0, 2.15, fz + 0.42);
+    awning.rotation.x = 0.22;
+    group.add(awning);
+
+    const signTitle = shopKind === "heart" ? "HEARTS" : "TURRETS";
+    const signSub = (shopKind === "heart" ? HEART_PRICE : TURRET_PRICE) + " COINS";
+    const signMat = new THREE.MeshBasicMaterial({
+      map: makeBannerTex(signTitle, signSub, shopKind === "heart" ? "heart" : "turret"),
+    });
+    const signBoard = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.86), signMat);
+    signBoard.position.set(0, 2.75, fz + 0.08);
+    group.add(signBoard);
+
+    if (shopKind === "heart") {
+      const emblem = createHeartMesh(0.7);
+      emblem.position.set(-1.35, 2.72, fz + 0.12);
+      emblem.rotation.y = 0.1;
+      group.add(emblem);
+    }
+
+    const lantern = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.34, 0.24),
+      new THREE.MeshLambertMaterial({
+        color: shopKind === "heart" ? 0xffd0d8 : 0xffe088,
+        emissive: shopKind === "heart" ? 0xff4466 : 0xff9a22,
+        emissiveIntensity: 1.0,
+        flatShading: true,
+      })
+    );
+    lantern.position.set(0.95, 1.85, fz + 0.45);
+    group.add(lantern);
+    const shopLight = new THREE.PointLight(shopKind === "heart" ? 0xff6688 : 0xffb44c, 2.2, 10);
+    shopLight.position.set(0.95, 1.8, fz + 0.7);
+    group.add(shopLight);
+
+    const winMat = lambert(0xffd888, { emissive: 0x664411 });
+    for (const side of [-1, 1]) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.55, 0.08), winMat);
+      win.position.set(side * w * 0.33, h * 0.62, fz);
+      group.add(win);
+    }
+
+    group.position.set(pos.x, 0, pos.z);
+    scene.add(group);
+    addCollider("house", pos.x, pos.z, w / 2, d / 2);
+    houses.push(group);
+    // keep the front plaza clear so later houses/trees don't block the shop
+    keepOuts.push({ x: pos.x, z: pos.z + d / 2 + 2.4, hx: w / 2 + 1.4, hz: 2.8 });
+
+    // place shopkeeper / healer right outside the open doorway so the player can reach them
+    const npcX = pos.x;
+    const npcZ = pos.z + d / 2 + 1.05;
+    const npc = shopKind === "heart" ? createHealerModel() : createShopkeeperModel();
+    npc.position.set(npcX, 0, npcZ);
+    scene.add(npc);
+    addCollider("npc", npcX, npcZ, 0.35, 0.35);
+
+    const stall = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), lambert(shopKind === "heart" ? 0xb07070 : 0x8a5a2c));
+    stall.position.set(pos.x - 1.15, 0.3, npcZ - 0.1);
+    scene.add(stall);
+    addCollider("npc", pos.x - 1.15, npcZ - 0.1, 0.34, 0.34);
+
+    if (shopKind === "heart") {
+      const miniHeart = createHeartMesh(0.85);
+      miniHeart.position.set(pos.x - 1.15, 0.92, npcZ - 0.1);
+      scene.add(miniHeart);
+      healer = { mesh: npc, x: npcX, z: npcZ, display: miniHeart, houseX: pos.x, houseZ: pos.z };
+    } else {
+      const mini = createTurretModel(false);
+      mini.root.scale.setScalar(0.55);
+      mini.root.position.set(pos.x - 1.15, 0.6, npcZ - 0.1);
+      scene.add(mini.root);
+      shopkeeper = { mesh: npc, x: npcX, z: npcZ, miniHead: mini.head, houseX: pos.x, houseZ: pos.z };
+    }
+    return;
+  }
+
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.25, 0.08), lambert(0x5a321c));
+  const face = rand() < 0.5 ? "z" : "x";
+  const sign = rand() < 0.5 ? 1 : -1;
+  if (face === "z") door.position.set(0, 0.62, sign * (d / 2 + 0.02));
+  else {
+    door.position.set(sign * (w / 2 + 0.02), 0.62, 0);
+    door.rotation.y = Math.PI / 2;
+  }
+  group.add(door);
+
+  const winMat = lambert(0x9ad4e8, { emissive: 0x223344 });
+  for (const side of [-1, 1]) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.08), winMat);
+    if (face === "z") win.position.set(side * w * 0.28, h * 0.62, sign * (d / 2 + 0.02));
+    else {
+      win.position.set(sign * (w / 2 + 0.02), h * 0.62, side * d * 0.28);
+      win.rotation.y = Math.PI / 2;
+    }
+    group.add(win);
+  }
+
+  if (rand() < 0.7) {
+    const chim = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.4), lambert(0x8a5a4a));
+    chim.position.set(w * 0.22, h + 0.6, d * 0.18);
+    group.add(chim);
+  }
+
+  group.position.set(pos.x, 0, pos.z);
+  scene.add(group);
+  addCollider("house", pos.x, pos.z, w / 2, d / 2);
+  houses.push(group);
+}
+
+// --- trees ---
+function createTree() {
+  const scale = randRange(0.75, 1.35);
+  const r = 0.55 * scale;
+  const pos = findSpot(r, r, 60);
+  if (!pos) return;
+  const group = new THREE.Group();
+  const trunkH = 1.15 * scale;
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16 * scale, 0.22 * scale, trunkH, 6),
+    lambert(0x6b4423)
+  );
+  trunk.position.y = trunkH / 2;
+  group.add(trunk);
+
+  const pine = rand() < 0.55;
+  const leafColors = [0x2f8a3a, 0x247a32, 0x3a9a44, 0x1f6b2c];
+  const leaf = lambert(randChoice(leafColors));
+  if (pine) {
+    for (let i = 0; i < 3; i++) {
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry((1.05 - i * 0.22) * scale, 1.15 * scale, 6),
+        leaf
+      );
+      cone.position.y = trunkH * 0.7 + i * 0.7 * scale;
+      group.add(cone);
+    }
+  } else {
+    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(1.05 * scale, 0), leaf);
+    bush.position.y = trunkH + 0.55 * scale;
+    bush.scale.y = 0.9;
+    group.add(bush);
+    if (rand() < 0.5) {
+      const bush2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 * scale, 0), leaf);
+      bush2.position.set(0.4 * scale, trunkH + 0.35 * scale, -0.15 * scale);
+      group.add(bush2);
+    }
+  }
+
+  group.position.set(pos.x, 0, pos.z);
+  scene.add(group);
+  addCollider("tree", pos.x, pos.z, r, r);
+  trees.push(group);
+}
+
+// --- rocks / flowers (no collision) ---
+function decorate() {
+  const rockMat = lambert(0x8a8a82);
+  for (let i = 0; i < 28; i++) {
+    const x = randRange(-WORLD_HALF + 3, WORLD_HALF - 3);
+    const z = randRange(-WORLD_HALF + 3, WORLD_HALF - 3);
+    if (Math.hypot(x, z) < 5 || overlaps(x, z, 0.4, 0.4, 0.6)) continue;
+    const rock = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(randRange(0.2, 0.55), 0),
+      rockMat
+    );
+    rock.position.set(x, 0.12, z);
+    rock.rotation.set(rand() * 1, rand() * 6, rand() * 1);
+    rock.scale.set(1, randRange(0.5, 0.9), 1.1);
+    scene.add(rock);
+  }
+  const petal = [0xff7aa2, 0xffe566, 0xffffff, 0x7ac8ff];
+  for (let i = 0; i < 40; i++) {
+    const x = randRange(-WORLD_HALF + 3, WORLD_HALF - 3);
+    const z = randRange(-WORLD_HALF + 3, WORLD_HALF - 3);
+    if (Math.hypot(x, z) < 4) continue;
+    const f = new THREE.Mesh(
+      new THREE.ConeGeometry(0.12, 0.22, 5),
+      lambert(randChoice(petal))
+    );
+    f.position.set(x, 0.12, z);
+    scene.add(f);
+  }
+}
+
+function makeSectorGeo(radius, halfAngle, segs = 14) {
+  const pos = [];
+  for (let i = 0; i < segs; i++) {
+    const a0 = -halfAngle + (i / segs) * halfAngle * 2;
+    const a1 = -halfAngle + ((i + 1) / segs) * halfAngle * 2;
+    pos.push(0, 0, 0, Math.sin(a0) * radius, 0, Math.cos(a0) * radius, Math.sin(a1) * radius, 0, Math.cos(a1) * radius);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+const turretConeGeo = makeSectorGeo(8.5, TURRET_FOV_HALF, 14);
+
+function createTurretModel(ghost = false) {
+  const root = new THREE.Group();
+  const mat = (hex, opts = {}) => ghost
+    ? new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.48, depthWrite: false })
+    : lambert(hex, opts);
+
+  const baseMat = mat(ghost ? 0x44ff77 : 0x49535e);
+  const darkMat = mat(ghost ? 0x22aa55 : 0x2c333b);
+  const headMat = mat(ghost ? 0x44ff77 : 0x6f7f8e);
+  const lensMat = ghost
+    ? new THREE.MeshBasicMaterial({ color: 0x88ffaa, transparent: true, opacity: 0.6 })
+    : new THREE.MeshStandardMaterial({ color: 0x44ffaa, emissive: 0x16aa66, emissiveIntensity: 0.9, flatShading: true });
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.24, 8), baseMat);
+  base.position.y = 0.12;
+  root.add(base);
+
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.34), darkMat);
+    leg.position.set(Math.sin(a) * 0.42, 0.09, Math.cos(a) * 0.42);
+    leg.rotation.y = a;
+    root.add(leg);
+  }
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.45, 6), darkMat);
+  neck.position.y = 0.44;
+  root.add(neck);
+
+  const head = new THREE.Group();
+  head.position.set(0, 0.72, 0);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.32, 0.54), headMat);
+  head.add(box);
+
+  const lens = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.08), lensMat);
+  lens.position.set(0, 0.06, 0.28);
+  head.add(lens);
+
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 0.56, 6), darkMat);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0, -0.04, 0.46);
+  head.add(barrel);
+
+  const muzzle = new THREE.Object3D();
+  muzzle.position.set(0, -0.04, 0.78);
+  head.add(muzzle);
+
+  root.add(head);
+
+  const coneMat = new THREE.MeshBasicMaterial({
+    color: ghost ? 0x44ff77 : 0x44ffaa,
+    transparent: true,
+    opacity: ghost ? 0.22 : 0.26,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const cone = new THREE.Mesh(turretConeGeo, coneMat);
+  cone.position.y = 0.04;
+  root.add(cone);
+
+  return { root, head, muzzle, cone, coneMat, mats: [baseMat, darkMat, headMat] };
+}
+
+const turretGhost = createTurretModel(true);
+turretGhost.root.visible = false;
+scene.add(turretGhost.root);
+
+createHouse("turret");
+createHouse("heart");
+for (let i = 0; i < 9; i++) createHouse();
+for (let i = 0; i < 34; i++) createTree();
+decorate();
+
+// --- wand viewmodels (camera-attached) ---
+wandRig = new THREE.Group();
+wandRig.position.set(0.34, -0.28, -0.48);
+wandRig.rotation.set(0.18, 0.28, 0.12);
+camera.add(wandRig);
+for (const id of [1, 2, 3]) {
+  const m = createWandModel(id);
+  m.visible = id === 1;
+  wandRig.add(m);
+  wandModels[id] = m;
+}
+const heldTurret = createTurretModel(false);
+heldTurret.cone.visible = false;
+heldTurret.root.scale.setScalar(0.32);
+heldTurret.root.position.set(0.02, -0.08, -0.06);
+heldTurret.root.rotation.set(0.1, -0.35, 0);
+heldTurret.root.visible = false;
+wandRig.add(heldTurret.root);
+wandModels[4] = heldTurret.root;
+
+function activeViewmodel() {
+  return wandModels[activeWand];
+}
+
+// --- crates / coins ---
+const crateMat = lambert(0xb07a3a);
+const crateEdge = lambert(0x6e4a22);
+function createCrateMesh() {
+  const g = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), crateMat);
+  box.position.y = 0.425;
+  g.add(box);
+  // slats
+  for (const [sx, sy, sz, wx, wy, wz] of [
+    [0, 0.425, 0.43, 0.9, 0.08, 0.04],
+    [0, 0.425, -0.43, 0.9, 0.08, 0.04],
+    [0.43, 0.425, 0, 0.04, 0.08, 0.9],
+    [-0.43, 0.425, 0, 0.04, 0.08, 0.9],
+    [0, 0.84, 0, 0.9, 0.05, 0.9],
+  ]) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(wx, wy, wz), crateEdge);
+    s.position.set(sx, sy, sz);
+    g.add(s);
+  }
+  return g;
+}
+
+function spawnCrate(x, z, respawn = false) {
+  if (x == null) {
+    const spot = findSpot(0.55, 0.55, 50);
+    if (!spot) return null;
+    x = spot.x; z = spot.z;
+  }
+  const mesh = createCrateMesh();
+  mesh.position.set(x, 0, z);
+  mesh.rotation.y = randRange(0, Math.PI * 2);
+  scene.add(mesh);
+  const col = addCollider("crate", x, z, 0.48, 0.48);
+  const crate = { id: ++boxId, mesh, x, z, col, alive: true, respawnAt: 0 };
+  crates.push(crate);
+  return crate;
+}
+
+for (let i = 0; i < 22; i++) spawnCrate();
+
+const coinGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.07, 12);
+const coinMat = new THREE.MeshStandardMaterial({
+  color: 0xffd24a,
+  emissive: 0xaa7700,
+  emissiveIntensity: 0.35,
+  metalness: 0.6,
+  roughness: 0.35,
+  flatShading: true,
+});
+function spawnCoin(x, y, z) {
+  const mesh = new THREE.Mesh(coinGeo, coinMat);
+  mesh.rotation.x = Math.PI / 2;
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+  coins3d.push({ mesh, x, y, z, t: 0, alive: true });
+}
+
+function findCoinSpot(x, z) {
+  const r = 0.38;
+  const clamp = (v) => Math.max(-WORLD_HALF + 1.2, Math.min(WORLD_HALF - 1.2, v));
+  x = clamp(x);
+  z = clamp(z);
+  if (!isSolidAt(x, z, r)) return { x, z };
+  for (let rad = 0.55; rad <= 5.0; rad += 0.55) {
+    const steps = 8 + Math.floor(rad * 4);
+    const off = rad * 1.7;
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2 + off;
+      const sx = clamp(x + Math.cos(a) * rad);
+      const sz = clamp(z + Math.sin(a) * rad);
+      if (!isSolidAt(sx, sz, r)) return { x: sx, z: sz };
+    }
+  }
+  return { x, z };
+}
+
+function dropCoinAt(x, z) {
+  const s = findCoinSpot(x, z);
+  spawnCoin(s.x, 0.7, s.z);
+  return s;
+}
+
+function dropDinoLoot(d) {
+  const ox = d.root.position.x;
+  const oz = d.root.position.z;
+  const extras = d.carriedCoins || 0;
+  if (d.isBoss) {
+    const n = 10 + extras;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.35;
+      const rad = 1.15 + Math.random() * 2.5;
+      dropCoinAt(ox + Math.cos(a) * rad, oz + Math.sin(a) * rad);
+    }
+  } else {
+    dropCoinAt(ox, oz);
+    for (let i = 0; i < extras; i++) {
+      const a = ((i + 0.5) / Math.max(1, extras)) * Math.PI * 2 + Math.random() * 0.5;
+      const rad = 0.7 + Math.random() * 1.4;
+      dropCoinAt(ox + Math.cos(a) * rad, oz + Math.sin(a) * rad);
+    }
+  }
+}
+
+function collectCoin(c) {
+  if (!c.alive) return;
+  c.alive = false;
+  scene.remove(c.mesh);
+  coins += 1;
+  coinsCollected += 1;
+  coinEl.textContent = String(coins);
+  beep(880, 0.12, "triangle", 0.05, 1320);
+}
+
+function dinoTakeCoin(d, c) {
+  if (!c.alive || !d.alive) return;
+  c.alive = false;
+  const pos = c.mesh.position.clone();
+  scene.remove(c.mesh);
+  d.carriedCoins = (d.carriedCoins || 0) + 1;
+  if (d.glint) {
+    d.glint.visible = true;
+    const s = Math.min(1.8, 0.75 + d.carriedCoins * 0.18);
+    d.glint.scale.setScalar(s);
+  }
+  burst(pos, 0xffd24a, 8, 3.2, 0.35);
+  beep(480, 0.08, "triangle", 0.03, 640);
+}
+
+// --- particles ---
+function burst(origin, color, count, speed, life) {
+  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), mat.clone());
+    m.position.copy(origin);
+    scene.add(m);
+    const vel = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8 + 0.2, Math.random() - 0.5)
+      .normalize()
+      .multiplyScalar(speed * (0.5 + Math.random()));
+    particles.push({ mesh: m, vel, life: life * (0.6 + Math.random() * 0.6), max: life, grav: 10 });
+  }
+}
+
+function breakCrate(crate) {
+  if (!crate.alive) return;
+  crate.alive = false;
+  scene.remove(crate.mesh);
+  const idx = colliders.indexOf(crate.col);
+  if (idx >= 0) colliders.splice(idx, 1);
+  const p = new THREE.Vector3(crate.x, 0.5, crate.z);
+  burst(p, 0xb07a3a, 14, 5.5, 0.7);
+  spawnCoin(crate.x, 0.7, crate.z);
+  crate.respawnAt = time + randRange(11, 18);
+  beep(180, 0.18, "sawtooth", 0.05, 70);
+}
+
+// --- dinosaurs ---
+const DINO_COLORS = [0x5aa85a, 0x3d8f6e, 0xc4783a, 0x7a9e3d, 0xd4a03a, 0x4a9e8a];
+
+function createDinoModel(color, isBoss = false) {
+  const root = new THREE.Group();
+  const bodyMat = lambert(color);
+  const dark = lambert(new THREE.Color(color).multiplyScalar(0.72).getHex());
+  const belly = lambert(0xf0e0b8);
+  const clawMat = lambert(new THREE.Color(color).multiplyScalar(0.45).getHex());
+  const mats = [bodyMat, dark, clawMat];
+
+  const hipY = isBoss ? 0.92 : 0.86;
+  const torso = new THREE.Group();
+  torso.position.set(0, hipY, 0);
+  root.add(torso);
+
+  // Forward-leaning body balanced by the tail
+  const bw = isBoss ? 0.72 : 0.46;
+  const bh = isBoss ? 0.5 : 0.36;
+  const bl = isBoss ? 1.15 : 0.82;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bl), bodyMat);
+  body.position.set(0, 0.12, 0.16);
+  body.rotation.x = 0.38;
+  torso.add(body);
+
+  const tum = new THREE.Mesh(
+    new THREE.BoxGeometry(bw * 0.7, bh * 0.42, bl * 0.72),
+    belly
+  );
+  tum.position.set(0, -0.04, 0.18);
+  tum.rotation.x = 0.38;
+  torso.add(tum);
+
+  // Longer neck
+  const neck = new THREE.Group();
+  neck.position.set(0, 0.22, 0.48);
+  neck.rotation.x = -0.35;
+  const neckM = new THREE.Mesh(
+    new THREE.BoxGeometry(isBoss ? 0.28 : 0.16, isBoss ? 0.28 : 0.18, isBoss ? 0.55 : 0.42),
+    bodyMat
+  );
+  neckM.position.set(0, 0, 0.18);
+  neck.add(neckM);
+  torso.add(neck);
+
+  const head = new THREE.Group();
+  head.position.set(0, 0.06, 0.48);
+  const skull = new THREE.Mesh(
+    new THREE.BoxGeometry(isBoss ? 0.5 : 0.32, isBoss ? 0.4 : 0.28, isBoss ? 0.48 : 0.34),
+    bodyMat
+  );
+  head.add(skull);
+  const snout = new THREE.Mesh(
+    new THREE.BoxGeometry(isBoss ? 0.28 : 0.18, isBoss ? 0.18 : 0.14, isBoss ? 0.5 : 0.4),
+    dark
+  );
+  snout.position.set(0, -0.04, isBoss ? 0.42 : 0.34);
+  head.add(snout);
+  const jaw = new THREE.Mesh(
+    new THREE.BoxGeometry(isBoss ? 0.24 : 0.15, 0.07, isBoss ? 0.38 : 0.3),
+    belly
+  );
+  jaw.position.set(0, -0.15, isBoss ? 0.36 : 0.28);
+  head.add(jaw);
+
+  const eyeW = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.05), lambert(0xfff6d8));
+  const eyeI = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.05), lambert(0xfff6d8));
+  const pup = lambert(0x1a120c);
+  const pL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), pup);
+  const pR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), pup);
+  const ex = isBoss ? 0.2 : 0.13;
+  eyeW.position.set(-ex, 0.08, 0.14);
+  eyeI.position.set(ex, 0.08, 0.14);
+  pL.position.set(-ex, 0.08, 0.18);
+  pR.position.set(ex, 0.08, 0.18);
+  head.add(eyeW, eyeI, pL, pR);
+  neck.add(head);
+
+  // Long stiff counterbalance tail
+  const tail = new THREE.Group();
+  tail.position.set(0, 0.1, -0.36);
+  const t1 = new THREE.Mesh(
+    new THREE.BoxGeometry(isBoss ? 0.28 : 0.18, isBoss ? 0.24 : 0.16, isBoss ? 0.85 : 0.7),
+    bodyMat
+  );
+  t1.position.z = isBoss ? -0.4 : -0.32;
+  t1.rotation.x = -0.18;
+  tail.add(t1);
+  const t2 = new THREE.Mesh(
+    new THREE.ConeGeometry(isBoss ? 0.12 : 0.08, isBoss ? 0.85 : 0.7, 5),
+    dark
+  );
+  t2.rotation.x = Math.PI / 2 - 0.12;
+  t2.position.set(0, 0.1, isBoss ? -1.05 : -0.88);
+  tail.add(t2);
+  torso.add(tail);
+
+  // Small forearms held up in front (tiny T-rex arms on the boss)
+  const arms = [];
+  const armScale = isBoss ? 0.55 : 1;
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Group();
+    arm.position.set(side * (isBoss ? 0.38 : 0.24), 0.08, 0.32);
+    arm.rotation.x = -0.85;
+    arm.rotation.z = side * 0.35;
+    const upper = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08 * armScale, 0.22 * armScale, 0.08 * armScale),
+      bodyMat
+    );
+    upper.position.set(0, -0.08 * armScale, 0);
+    arm.add(upper);
+    const hand = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1 * armScale, 0.07 * armScale, 0.08 * armScale),
+      dark
+    );
+    hand.position.set(0, -0.2 * armScale, 0.02);
+    arm.add(hand);
+    for (const cs of [-0.03, 0.03]) {
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.018 * armScale, 0.1 * armScale, 4), clawMat);
+      claw.rotation.x = Math.PI / 2;
+      claw.position.set(cs * armScale, -0.22 * armScale, 0.08 * armScale);
+      arm.add(claw);
+    }
+    torso.add(arm);
+    arms.push(arm);
+  }
+
+  // Two strong hind legs
+  const legs = [];
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Group();
+    leg.position.set(side * (isBoss ? 0.26 : 0.18), hipY, -0.1);
+    const thigh = new THREE.Mesh(
+      new THREE.BoxGeometry(isBoss ? 0.26 : 0.18, isBoss ? 0.48 : 0.4, isBoss ? 0.3 : 0.22),
+      dark
+    );
+    thigh.position.set(0, -0.16, 0.05);
+    thigh.rotation.x = 0.4;
+    leg.add(thigh);
+    const shin = new THREE.Group();
+    shin.position.set(0, -0.36, 0.1);
+    const shinM = new THREE.Mesh(
+      new THREE.BoxGeometry(isBoss ? 0.2 : 0.14, isBoss ? 0.44 : 0.38, isBoss ? 0.22 : 0.16),
+      dark
+    );
+    shinM.position.set(0, -0.16, 0);
+    shin.add(shinM);
+    const foot = new THREE.Mesh(
+      new THREE.BoxGeometry(isBoss ? 0.2 : 0.14, 0.08, isBoss ? 0.4 : 0.32),
+      dark
+    );
+    foot.position.set(0, -0.38, 0.08);
+    shin.add(foot);
+    const claw = new THREE.Mesh(new THREE.ConeGeometry(isBoss ? 0.055 : 0.04, 0.16, 4), clawMat);
+    claw.rotation.x = Math.PI / 2;
+    claw.position.set(0, -0.4, 0.26);
+    shin.add(claw);
+    // sickle / inner claw
+    const sickle = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.15, 4), clawMat);
+    sickle.rotation.z = side * 0.9;
+    sickle.rotation.x = 0.5;
+    sickle.position.set(-side * 0.08, -0.26, 0.04);
+    shin.add(sickle);
+    leg.add(shin);
+    leg.userData.shin = shin;
+    root.add(leg);
+    legs.push(leg);
+  }
+
+  return {
+    root, head, tail, legs, arms, neck, body: torso, mats, jaw,
+    eyeW, eyeI, pL, pR, hipY,
+  };
+}
+
+function dinoSpawnPoint(awayFromPlayer) {
+  for (let i = 0; i < 40; i++) {
+    const ang = rand() * Math.PI * 2;
+    const rad = awayFromPlayer ? randRange(22, WORLD_HALF - 4) : randRange(12, WORLD_HALF - 6);
+    const x = Math.cos(ang) * rad;
+    const z = Math.sin(ang) * rad;
+    const px = camera.position.x;
+    const pz = camera.position.z;
+    if (awayFromPlayer && Math.hypot(x - px, z - pz) < 14) continue;
+    if (overlaps(x, z, 0.5, 0.5, 1.0) && awayFromPlayer) continue;
+    if (Math.abs(x) < WORLD_HALF - 3 && Math.abs(z) < WORLD_HALF - 3) return { x, z };
+  }
+  return { x: WORLD_HALF - 6, z: WORLD_HALF - 6 };
+}
+
+let alertTex = null;
+function getAlertTexture() {
+  if (alertTex) return alertTex;
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 80;
+  const ctx = c.getContext("2d");
+  ctx.font = "bold 64px Trebuchet MS, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.strokeStyle = "#3a0000";
+  ctx.lineWidth = 8;
+  ctx.strokeText("!", 32, 42);
+  ctx.fillStyle = "#ff2a22";
+  ctx.fillText("!", 32, 42);
+  alertTex = new THREE.CanvasTexture(c);
+  alertTex.colorSpace = THREE.SRGBColorSpace;
+  return alertTex;
+}
+
+function spawnDino(away = false, isBoss = false) {
+  const cap = bossSpawned ? MAX_DINOS_BOSS : MAX_DINOS;
+  if (!isBoss && dinos.filter((d) => d.alive && !d.isBoss).length >= cap) return;
+  const color = isBoss ? 0x5c1824 : randChoice(DINO_COLORS);
+  const { root, head, tail, legs, arms, neck, body, mats, jaw, eyeW, eyeI, pL, pR, hipY } = createDinoModel(color, isBoss);
+  if (isBoss) {
+    const glowEye = new THREE.MeshBasicMaterial({ color: 0xff4400 });
+    eyeW.material = glowEye;
+    eyeI.material = glowEye;
+    pL.material = new THREE.MeshBasicMaterial({ color: 0xffe680 });
+    pR.material = new THREE.MeshBasicMaterial({ color: 0xffe680 });
+    const hornMat = lambert(0x230a0e);
+    for (const s of [-0.14, 0.14]) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 5), hornMat);
+      horn.position.set(s, 0.24, 0.08);
+      horn.rotation.x = 0.35;
+      head.add(horn);
+    }
+  }
+  const spot = dinoSpawnPoint(away);
+  root.position.set(spot.x, 0, spot.z);
+  const scale = isBoss ? 2.85 : randRange(0.9, 1.2);
+  root.scale.setScalar(scale);
+  const mark = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: getAlertTexture(),
+    transparent: true,
+    depthTest: true,
+  }));
+  mark.position.set(0, 2.15, 0);
+  mark.scale.set(0.7, 0.88, 0.7);
+  mark.visible = false;
+  root.add(mark);
+  const glint = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.1, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0xffd24a,
+      emissive: 0xcc8800,
+      emissiveIntensity: 0.85,
+      flatShading: true,
+      metalness: 0.55,
+      roughness: 0.3,
+    })
+  );
+  glint.position.set(0.26, 0.95, 0.05);
+  glint.visible = false;
+  root.add(glint);
+  scene.add(root);
+  const orig = mats.map((m) => m.color.clone());
+  dinos.push({
+    root, head, tail, legs, arms, neck, body, mats, orig, jaw, hipY,
+    alertMark: mark,
+    alive: true,
+    isBoss,
+    hp: isBoss ? BOSS_HP : DINO_HP,
+    maxHp: isBoss ? BOSS_HP : DINO_HP,
+    flashUntil: 0,
+    wanderT: 0,
+    target: new THREE.Vector3(spot.x, 0, spot.z),
+    heading: rand() * Math.PI * 2,
+    anim: rand() * 10,
+    scale,
+    mode: "wander",
+    telegraphT: 0,
+    chargeT: 0,
+    cooldownT: 0,
+    packDelay: 0,
+    staggerUntil: 0,
+    kbX: 0,
+    kbZ: 0,
+    passedClose: false,
+    chargeSpeed: isBoss ? DINO_CHARGE_SPEED * 0.86 : DINO_CHARGE_SPEED,
+    pitchVar: randRange(-0.14, 0.14),
+    targetKind: "player",
+    targetTurret: null,
+    biteCooldown: 0,
+    stepPhase: 0,
+    carriedCoins: 0,
+    glint,
+  });
+  const created = dinos[dinos.length - 1];
+  if (isBoss) {
+    activeBoss = created;
+    bossBarEl.classList.remove("hidden");
+    updateBossBar();
+  }
+  return created;
+}
+
+function updateBossBar() {
+  if (!activeBoss || !activeBoss.alive) {
+    bossBarEl.classList.add("hidden");
+    return;
+  }
+  bossBarEl.classList.remove("hidden");
+  const pct = Math.max(0, Math.min(1, activeBoss.hp / activeBoss.maxHp));
+  bossFillEl.style.width = (pct * 100) + "%";
+}
+
+function updateDinoCounter() {
+  dinoEl.textContent = bossSpawned ? String(dinosDefeated) : (dinosDefeated + "/" + BOSS_KILLS_REQ);
+}
+
+function triggerBoss() {
+  if (bossSpawned) return;
+  bossSpawned = true;
+  updateDinoCounter();
+  showToast("Something big is coming...", 3.4);
+  const b = spawnDino(true, true);
+  if (b) shriekAt(b);
+}
+
+function killDino(d) {
+  if (!d.alive) return;
+  d.alive = false;
+  dropDinoLoot(d);
+  const p = d.root.position.clone();
+  p.y = d.isBoss ? 1.5 : 0.6;
+  burst(p, d.orig[0].getHex(), d.isBoss ? 36 : 16, d.isBoss ? 9 : 6, d.isBoss ? 1.2 : 0.8);
+  scene.remove(d.root);
+  dinosDefeated += 1;
+  updateDinoCounter();
+  maybeUnlockPteras();
+  beep(d.isBoss ? 70 : 140, d.isBoss ? 0.55 : 0.25, "sawtooth", 0.07, 40);
+  if (d.isBoss) {
+    updateBossBar();
+    // brief beat so the 10-coin burst is visible, then scoop & show victory
+    victoryAt = time + 1.05;
+    return;
+  }
+  maybeTriggerBoss();
+}
+
+
+function createPteraModel() {
+  const root = new THREE.Group();
+  const skin = lambert(0x6a7a62);
+  const dark = lambert(0x3e4a38);
+  const memMat = new THREE.MeshLambertMaterial({
+    color: 0x8a6b55, flatShading: true, side: THREE.DoubleSide,
+  });
+  const crest = lambert(0x8c3a32);
+  const mats = [skin, dark, memMat, crest];
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.55), skin);
+  root.add(body);
+
+  const head = new THREE.Group();
+  head.position.set(0, 0.08, 0.32);
+  const skull = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.24), skin);
+  head.add(skull);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.62, 5), dark);
+  beak.rotation.x = Math.PI / 2;
+  beak.position.set(0, -0.02, 0.42);
+  head.add(beak);
+  const cr = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.34, 5), crest);
+  cr.rotation.x = -0.95;
+  cr.position.set(0, 0.18, -0.02);
+  head.add(cr);
+  const eyeMat = lambert(0x1a120c);
+  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.045), eyeMat);
+  eyeL.position.set(-0.1, 0.04, 0.1);
+  const eyeR = eyeL.clone();
+  eyeR.position.x = 0.1;
+  head.add(eyeL, eyeR);
+  root.add(head);
+
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Group();
+    wing.position.set(side * 0.12, 0.04, 0.04);
+    const bone = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.045, 0.06), dark);
+    bone.position.set(side * 0.55, 0, 0);
+    wing.add(bone);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([
+      0, 0, 0.1,
+      side * 1.25, -0.06, -0.12,
+      side * 0.12, -0.02, -0.42,
+    ]), 3));
+    geo.computeVertexNormals();
+    const mem = new THREE.Mesh(geo, memMat);
+    wing.add(mem);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.2, 4), dark);
+    tip.rotation.z = -side * Math.PI / 2;
+    tip.position.set(side * 1.28, -0.04, -0.08);
+    wing.add(tip);
+    root.add(wing);
+    wings.push(wing);
+  }
+
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.36, 4), dark);
+  tail.rotation.x = Math.PI / 2;
+  tail.position.set(0, 0, -0.42);
+  root.add(tail);
+
+  return { root, head, wings, tail, body, mats };
+}
+
+function pteraSpawnPoint() {
+  const ang = rand() * Math.PI * 2;
+  const dist = randRange(18, 32);
+  let x = camera.position.x + Math.sin(ang) * dist;
+  let z = camera.position.z + Math.cos(ang) * dist;
+  x = Math.max(-WORLD_HALF + 4, Math.min(WORLD_HALF - 4, x));
+  z = Math.max(-WORLD_HALF + 4, Math.min(WORLD_HALF - 4, z));
+  const y = randRange(PTERA_ALT_MIN + 1, PTERA_ALT_MAX - 1);
+  return { x, y, z };
+}
+
+function pteraCap() {
+  return difficulty === "hard" ? PTERA_MAX_HARD : PTERA_MAX_EASY;
+}
+
+function pteraRespawnDelay() {
+  return difficulty === "hard" ? randRange(16, 26) : randRange(7, 14);
+}
+
+function spawnPtera() {
+  if (pteras.filter((p) => p.alive).length >= pteraCap()) return null;
+  const { root, head, wings, tail, body, mats } = createPteraModel();
+  const spot = pteraSpawnPoint();
+  root.position.set(spot.x, spot.y, spot.z);
+  const heading = rand() * Math.PI * 2;
+  root.rotation.y = heading;
+  scene.add(root);
+  const orig = mats.map((m) => m.color.clone());
+  const p = {
+    root, head, wings, tail, body, mats, orig,
+    alive: true,
+    falling: false,
+    finished: false,
+    credited: false,
+    aggroKind: null,
+    aggroTurret: null,
+    freezeY: null,
+    hp: PTERA_HP,
+    heading,
+    pitch: 0,
+    bank: 0,
+    mode: "cruise",
+    anim: rand() * 10,
+    cruiseAlt: spot.y,
+    wanderT: 0,
+    circleDir: rand() < 0.5 ? 1 : -1,
+    target: new THREE.Vector3(spot.x, spot.y, spot.z),
+    cooldownT: randRange(0.8, 2.4),
+    telegraphT: 0,
+    diveT: 0,
+    diveAim: new THREE.Vector3(),
+    velY: 0,
+    spin: 0,
+    flashUntil: 0,
+    aimY: spot.y,
+  };
+  pteras.push(p);
+  return p;
+}
+
+function maybeUnlockPteras() {
+  if (pterasUnlocked || dinosDefeated < PTERA_UNLOCK) return;
+  pterasUnlocked = true;
+  showToast("Something's circling overhead...", 2.8);
+  if (shopSafe) {
+    pteraSpawnTimer = 0.35;
+    return;
+  }
+  const n = difficulty === "hard" ? 1 : 2;
+  for (let i = 0; i < n; i++) spawnPtera();
+  pteraSpawnTimer = pteraRespawnDelay();
+}
+
+function clearPteras() {
+  for (const p of pteras) {
+    if (p.root.parent) scene.remove(p.root);
+  }
+  pteras.length = 0;
+  pterasUnlocked = false;
+  pteraSpawnTimer = 6;
+}
+
+function dropPteraLoot(p) {
+  const base = findCoinSpot(p.root.position.x, p.root.position.z);
+  dropCoinAt(base.x, base.z);
+  const extra = findCoinSpot(base.x + randRange(-1.4, 1.4), base.z + randRange(-1.4, 1.4));
+  dropCoinAt(extra.x, extra.z);
+}
+
+function creditPteraKill() {
+  dinosDefeated += 1;
+  updateDinoCounter();
+  maybeUnlockPteras();
+  maybeTriggerBoss();
+}
+
+function killPtera(p) {
+  if (!p.alive || p.falling) return;
+  p.alive = false;
+  p.falling = true;
+  p.mode = "falling";
+  p.velY = 1.4;
+  p.spin = randRange(4, 8) * (rand() < 0.5 ? 1 : -1);
+  p.credited = true;
+  beep(220, 0.3, "sawtooth", 0.06, 80);
+  creditPteraKill();
+}
+
+function finishPteraFall(p) {
+  if (p.finished) return;
+  p.finished = true;
+  p.falling = false;
+  if (!p.credited) {
+    p.credited = true;
+    creditPteraKill();
+  }
+  dropPteraLoot(p);
+  const pos = p.root.position.clone();
+  pos.y = 0.4;
+  burst(pos, p.orig[0].getHex(), 14, 5, 0.7);
+  if (p.root.parent) scene.remove(p.root);
+}
+
+function hurtPtera(p, damage = 1, source = null) {
+  if (!p.alive || p.falling) return;
+  p.hp -= damage;
+  p.flashUntil = time + 0.12;
+  for (const m of p.mats) m.color.set(0xff3333);
+  beep(420, 0.08, "square", 0.05);
+  if (p.hp <= 0) {
+    killPtera(p);
+    return;
+  }
+  aggroPtera(p, source);
+}
+
+function pteraAggroTarget(p) {
+  if (p.aggroKind === "turret" && p.aggroTurret && p.aggroTurret.alive) {
+    return { x: p.aggroTurret.x, z: p.aggroTurret.z };
+  }
+  p.aggroKind = "player";
+  p.aggroTurret = null;
+  return { x: camera.position.x, z: camera.position.z };
+}
+
+function aggroPtera(p, source) {
+  if (!p || !p.alive || p.falling) return;
+  const fromTurret = !!(source && source.fromTurret && source.turret && source.turret.alive);
+  p.aggroKind = fromTurret ? "turret" : "player";
+  p.aggroTurret = fromTurret ? source.turret : null;
+  if (p.mode === "dive" || p.mode === "telegraph") {
+    if (fromTurret) {
+      p.mode = "approach";
+      p.wanderT = 0;
+    }
+    return;
+  }
+  if (fromTurret || difficulty !== "hard") {
+    p.mode = "approach";
+    p.wanderT = 0;
+    p.cooldownT = 0;
+    return;
+  }
+  const hdist = Math.hypot(camera.position.x - p.root.position.x, camera.position.z - p.root.position.z);
+  if (hdist > 36 || p.root.position.y < 4) {
+    p.mode = "approach";
+    p.wanderT = 0;
+    p.cooldownT = 0;
+  } else {
+    p.mode = "telegraph";
+    p.telegraphT = PTERA_TELEGRAPH;
+    screechPtera(p);
+  }
+}
+
+function flyToward(p, tx, ty, tz, speed, dt, yawRate, pitchRate) {
+  const dx = tx - p.root.position.x;
+  const dy = ty - p.root.position.y;
+  const dz = tz - p.root.position.z;
+  const desiredYaw = Math.atan2(dx, dz);
+  const yawD = angleDiff(desiredYaw, p.heading);
+  p.heading += Math.sign(yawD) * Math.min(Math.abs(yawD), yawRate * dt);
+  const horiz = Math.hypot(dx, dz) || 0.0001;
+  const want = Math.atan2(-dy, horiz);
+  p.pitch += Math.sign(want - p.pitch) * Math.min(Math.abs(want - p.pitch), pitchRate * dt);
+  p.pitch = Math.max(-0.85, Math.min(1.15, p.pitch));
+  const wantBank = Math.max(-0.7, Math.min(0.7, -yawD * 1.25));
+  p.bank += (wantBank - p.bank) * Math.min(1, dt * 4);
+  p.root.rotation.y = p.heading;
+  p.root.rotation.x = p.pitch;
+  p.root.rotation.z = p.bank;
+  p.root.position.x += Math.sin(p.heading) * Math.cos(p.pitch) * speed * dt;
+  p.root.position.z += Math.cos(p.heading) * Math.cos(p.pitch) * speed * dt;
+  p.root.position.y += -Math.sin(p.pitch) * speed * dt;
+  if (p.mode === "cruise") {
+    p.root.position.y = Math.max(PTERA_ALT_MIN - 0.4, Math.min(PTERA_ALT_MAX + 0.8, p.root.position.y));
+  }
+  p.root.position.x = Math.max(-WORLD_HALF + 1, Math.min(WORLD_HALF - 1, p.root.position.x));
+  p.root.position.z = Math.max(-WORLD_HALF + 1, Math.min(WORLD_HALF - 1, p.root.position.z));
+  p.aimY = p.root.position.y;
+}
+
+function updatePteras(dt) {
+  maybeUnlockPteras();
+  if (pterasUnlocked && state === "playing" && !shopSafe) {
+    const living = pteras.filter((p) => p.alive).length;
+    if (living < pteraCap()) {
+      pteraSpawnTimer -= dt;
+      if (pteraSpawnTimer <= 0) {
+        spawnPtera();
+        pteraSpawnTimer = pteraRespawnDelay();
+      }
+    }
+  }
+
+  for (const p of pteras) {
+    if (p.finished) continue;
+    if (p.flashUntil && time > p.flashUntil) {
+      p.flashUntil = 0;
+      tintMob(p, shopSafe);
+    }
+    const idleSafe = shopSafe && p.alive && !p.falling;
+    p.anim += dt * (idleSafe ? 6 : p.mode === "dive" ? 16 : p.mode === "telegraph" ? 11 : 8);
+    const flap = Math.sin(p.anim) * (idleSafe ? 0.45 : p.mode === "dive" ? 0.22 : 0.55);
+    if (p.wings[0]) p.wings[0].rotation.z = -0.2 - flap;
+    if (p.wings[1]) p.wings[1].rotation.z = 0.2 + flap;
+    if (p.head && p.mode !== "telegraph") p.head.rotation.x = Math.sin(p.anim * 0.5) * 0.08;
+
+    if (p.mode === "falling") {
+      p.velY -= 18 * dt;
+      p.root.position.y += p.velY * dt;
+      p.root.rotation.x += p.spin * 0.6 * dt;
+      p.root.rotation.z += p.spin * dt;
+      p.root.position.x += Math.sin(p.heading) * 2.2 * dt;
+      p.root.position.z += Math.cos(p.heading) * 2.2 * dt;
+      if (p.root.position.y <= 0.2) {
+        p.root.position.y = 0.15;
+        finishPteraFall(p);
+      }
+      continue;
+    }
+    if (!p.alive) continue;
+    if (state !== "playing") continue;
+
+    if (shopSafe) {
+      if (p.freezeY == null) p.freezeY = p.root.position.y;
+      p.root.position.y = p.freezeY + Math.sin(time * 2.4) * 0.08;
+      p.aimY = p.root.position.y;
+      continue;
+    }
+    p.freezeY = null;
+    p.aimY = p.root.position.y;
+
+    if (p.mode === "cruise") {
+      p.wanderT -= dt;
+      if (p.wanderT <= 0) {
+        let x, z;
+        if (rand() < 0.5) {
+          const a = rand() * Math.PI * 2;
+          const r = randRange(14, 26);
+          x = camera.position.x + Math.sin(a) * r;
+          z = camera.position.z + Math.cos(a) * r;
+        } else {
+          const ang = p.heading + p.circleDir * randRange(0.7, 1.7);
+          const dist = randRange(10, 22);
+          x = p.root.position.x + Math.sin(ang) * dist;
+          z = p.root.position.z + Math.cos(ang) * dist;
+        }
+        x = Math.max(-WORLD_HALF + 3, Math.min(WORLD_HALF - 3, x));
+        z = Math.max(-WORLD_HALF + 3, Math.min(WORLD_HALF - 3, z));
+        p.cruiseAlt = randRange(PTERA_ALT_MIN, PTERA_ALT_MAX);
+        p.target.set(x, p.cruiseAlt, z);
+        p.wanderT = randRange(2.5, 5.5);
+      }
+      flyToward(p, p.target.x, p.cruiseAlt, p.target.z, PTERA_CRUISE, dt, 1.6, 1.1);
+      p.cooldownT = Math.max(0, p.cooldownT - dt);
+
+      if (difficulty === "hard" && p.cooldownT <= 0) {
+        const hdist = Math.hypot(camera.position.x - p.root.position.x, camera.position.z - p.root.position.z);
+        if (hdist < PTERA_RANGE && p.root.position.y > 4
+            && hasLineOfSight(p.root.position.x, p.root.position.z, camera.position.x, camera.position.z)) {
+          p.mode = "telegraph";
+          p.telegraphT = PTERA_TELEGRAPH;
+          screechPtera(p);
+        }
+      }
+    } else if (p.mode === "telegraph") {
+      p.root.position.y += dt * 1.8;
+      p.pitch += (-0.45 - p.pitch) * Math.min(1, dt * 4);
+      p.bank += (0 - p.bank) * Math.min(1, dt * 3);
+      p.root.rotation.x = p.pitch;
+      p.root.rotation.z = p.bank;
+      p.root.rotation.y = p.heading;
+      if (p.head) p.head.rotation.x = -0.4;
+      p.telegraphT -= dt;
+      if (p.telegraphT <= 0) {
+        p.mode = "dive";
+        p.diveT = 2.2;
+        p.diveAim.set(camera.position.x, 1.0, camera.position.z);
+      }
+    } else if (p.mode === "dive") {
+      p.diveT -= dt;
+      p.diveAim.x += (camera.position.x - p.diveAim.x) * Math.min(1, PTERA_DIVE_TURN * dt * 0.45);
+      p.diveAim.z += (camera.position.z - p.diveAim.z) * Math.min(1, PTERA_DIVE_TURN * dt * 0.45);
+      p.diveAim.y = 0.9;
+      flyToward(p, p.diveAim.x, p.diveAim.y, p.diveAim.z, PTERA_DIVE_SPEED, dt, PTERA_DIVE_TURN, 3.2);
+      const pdx = p.root.position.x - camera.position.x;
+      const pdy = p.root.position.y - camera.position.y;
+      const pdz = p.root.position.z - camera.position.z;
+      if (Math.hypot(pdx, pdy, pdz) < 1.35) {
+        if (isCombatFrozen()) {
+          p.mode = "climb";
+          p.cooldownT = PTERA_COOLDOWN;
+          p.cruiseAlt = randRange(PTERA_ALT_MIN + 2, PTERA_ALT_MAX);
+          continue;
+        }
+        takeHit("ptera", p);
+        p.mode = "climb";
+        p.cooldownT = PTERA_COOLDOWN + 1;
+        p.cruiseAlt = randRange(PTERA_ALT_MIN + 2, PTERA_ALT_MAX);
+        continue;
+      }
+      const horiz = Math.hypot(camera.position.x - p.root.position.x, camera.position.z - p.root.position.z);
+      if (p.root.position.y < 1.4 || p.diveT <= 0 || (horiz < 2.5 && p.root.position.y < camera.position.y + 0.4)) {
+        p.mode = "climb";
+        p.cooldownT = PTERA_COOLDOWN;
+        p.cruiseAlt = randRange(PTERA_ALT_MIN + 2, PTERA_ALT_MAX);
+      }
+    } else if (p.mode === "climb") {
+      const tx = p.root.position.x + Math.sin(p.heading) * 14;
+      const tz = p.root.position.z + Math.cos(p.heading) * 14;
+      flyToward(p, tx, p.cruiseAlt, tz, PTERA_CRUISE * 1.15, dt, 1.8, 2.4);
+      if (p.root.position.y >= p.cruiseAlt - 0.6) {
+        p.mode = p.aggroKind ? "approach" : "cruise";
+        p.wanderT = 0.4;
+      }
+    } else if (p.mode === "approach") {
+      const tgt = pteraAggroTarget(p);
+      if (p.cruiseAlt == null) p.cruiseAlt = randRange(PTERA_ALT_MIN + 1, 10);
+      flyToward(p, tgt.x, p.cruiseAlt, tgt.z, PTERA_CRUISE * 1.2, dt, 2.0, 1.6);
+      const hdist = Math.hypot(tgt.x - p.root.position.x, tgt.z - p.root.position.z);
+      if (p.aggroKind !== "turret" && difficulty === "hard") {
+        if (hdist < 34 && p.root.position.y > 4) {
+          p.mode = "telegraph";
+          p.telegraphT = PTERA_TELEGRAPH;
+          screechPtera(p);
+        }
+      } else if (hdist < 12) {
+        p.mode = "circle";
+        p.wanderT = 0;
+      }
+    } else if (p.mode === "circle") {
+      const tgt = pteraAggroTarget(p);
+      p.wanderT -= dt;
+      if (p.wanderT <= 0) {
+        const a = Math.atan2(p.root.position.x - tgt.x, p.root.position.z - tgt.z) + p.circleDir * 0.95;
+        const r = randRange(8, 12);
+        if (p.cruiseAlt == null) p.cruiseAlt = randRange(PTERA_ALT_MIN + 0.5, 9);
+        p.target.set(tgt.x + Math.sin(a) * r, p.cruiseAlt, tgt.z + Math.cos(a) * r);
+        p.wanderT = randRange(1.2, 2.2);
+      }
+      flyToward(p, p.target.x, p.cruiseAlt, p.target.z, PTERA_CRUISE, dt, 2.0, 1.4);
+    }
+  }
+}
+
+function scoopCoinsAndVictory() {
+  for (let i = coins3d.length - 1; i >= 0; i--) {
+    const c = coins3d[i];
+    if (c.alive) collectCoin(c);
+  }
+  coins3d.length = 0;
+  victoryAt = 0;
+  onVictory();
+}
+
+function flashDino(d) {
+  d.flashUntil = time + 0.12;
+  for (const m of d.mats) m.color.set(0xff3333);
+  beep(320, 0.08, "square", 0.05);
+}
+
+// --- projectiles ---
+const boltGeo = new THREE.SphereGeometry(0.09, 6, 6);
+const boltMat = new THREE.MeshBasicMaterial({ color: 0xe8c6ff });
+const boltCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+function spawnBolt(origin, dir, def) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: def.color });
+  const glow = new THREE.Mesh(boltGeo, mat);
+  const s = def.scale;
+  glow.scale.set(s, s, 2.2 * s);
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.05 * s, 6, 6), boltCoreMat);
+  group.add(glow, core);
+  group.position.copy(origin);
+  group.lookAt(origin.clone().add(dir));
+  scene.add(group);
+  const light = new THREE.PointLight(def.light, def.id === 2 ? 3.2 : 1.6, def.id === 2 ? 9 : 6);
+  group.add(light);
+  bolts.push({
+    mesh: group, dir: dir.clone().normalize(),
+    life: def.life, light, speed: def.speed,
+    damage: def.damage, splash: def.splash, splashDamage: def.splashDamage,
+    color: def.color, id: def.id,
+    fromTurret: !!def.fromTurret,
+    turret: def.turret || null,
+    pierce: def.id === 2,
+    hitSet: new Set(),
+  });
+}
+
+function yawOffset(dir, angle) {
+  const v = dir.clone();
+  const e = new THREE.Euler(0, angle, 0, "YXZ");
+  v.applyEuler(e);
+  v.normalize();
+  return v;
+}
+
+function shootWand() {
+  if (state !== "playing") return;
+  if (performance.now() < shootLockUntil) return;
+  const def = WAND_DEFS[activeWand - 1];
+  if (!def.unlocked) return;
+  if (time < wandReadyAt[activeWand]) return;
+
+  const baseDir = new THREE.Vector3();
+  camera.getWorldDirection(baseDir);
+  const origin = new THREE.Vector3();
+  const vm = activeViewmodel();
+  vm.userData.crystal.getWorldPosition(origin);
+  origin.addScaledVector(baseDir, 0.35);
+
+  if (def.spread) {
+    spawnBolt(origin, baseDir, def);
+    spawnBolt(origin, yawOffset(baseDir, def.spread), def);
+    spawnBolt(origin, yawOffset(baseDir, -def.spread), def);
+    beep(820, 0.08, "square", 0.045, 280);
+    beep(980, 0.07, "triangle", 0.03, 420);
+  } else if (def.id === 2) {
+    spawnBolt(origin, baseDir, def);
+    beep(220, 0.16, "sawtooth", 0.07, 90);
+    beep(140, 0.2, "square", 0.04, 60);
+  } else {
+    spawnBolt(origin, baseDir, def);
+    beep(660, 0.09, "square", 0.05, 220);
+  }
+
+  wandReadyAt[activeWand] = time + def.fireGap;
+  wandRecoil = def.id === 2 ? 1.35 : 1;
+  flashEnergy = def.id === 2 ? 1.4 : 1;
+}
+
+function applySplash(pos, bolt, skip) {
+  if (!bolt.splash) return;
+  burst(pos.clone(), bolt.color, 16, 6.5, 0.55);
+  for (const d of dinos) {
+    if (!d.alive || d === skip) continue;
+    const p = d.root.position;
+    if (Math.hypot(pos.x - p.x, pos.z - p.z) < bolt.splash && pos.y < 3.6) {
+      hurtDino(d, pos, bolt.splashDamage || 1, bolt);
+    }
+  }
+  for (const pt of pteras) {
+    if (!pt.alive || pt.falling || pt === skip) continue;
+    const p = pt.root.position;
+    if (Math.hypot(pos.x - p.x, pos.y - p.y, pos.z - p.z) < bolt.splash + 0.5) {
+      hurtPtera(pt, bolt.splashDamage || 1, bolt);
+    }
+  }
+}
+
+function hitScan(bolt, dt) {
+  const pos = bolt.mesh.position;
+  if (pos.y <= 0.05) {
+    burst(pos.clone(), bolt.color || 0xe8c6ff, bolt.id === 2 ? 10 : 5, 3.5, 0.3);
+    applySplash(pos, bolt, null);
+    return true;
+  }
+  if (!bolt.fromTurret) for (const crate of crates) {
+    if (!crate.alive) continue;
+    const dx = pos.x - crate.x;
+    const dy = pos.y - 0.42;
+    const dz = pos.z - crate.z;
+    if (Math.abs(dx) < 0.55 + (bolt.id === 2 ? 0.25 : 0)
+      && Math.abs(dy) < 0.6 + (bolt.id === 2 ? 0.2 : 0)
+      && Math.abs(dz) < 0.55 + (bolt.id === 2 ? 0.25 : 0)) {
+      breakCrate(crate);
+      applySplash(pos, bolt, null);
+      if (!bolt.pierce) return true;
+    }
+  }
+  for (const d of dinos) {
+    if (!d.alive) continue;
+    if (bolt.pierce && bolt.hitSet.has(d)) continue;
+    const p = d.root.position;
+    const rad = (d.isBoss ? 0.9 : 0.62) * d.scale + (bolt.id === 2 ? 0.28 : 0);
+    const maxY = (d.isBoss ? 2.35 : 1.9) * d.scale;
+    if (Math.hypot(pos.x - p.x, pos.z - p.z) < rad + 0.15 && pos.y < maxY && pos.y > 0) {
+      if (bolt.pierce) bolt.hitSet.add(d);
+      hurtDino(d, pos, bolt.damage || 1, bolt);
+      applySplash(pos, bolt, d);
+      if (!bolt.pierce) return true;
+    }
+  }
+  for (const pt of pteras) {
+    if (!pt.alive || pt.falling) continue;
+    if (bolt.pierce && bolt.hitSet.has(pt)) continue;
+    const p = pt.root.position;
+    const rad = PTERA_HIT_R + (bolt.id === 2 ? 0.28 : 0);
+    if (Math.hypot(pos.x - p.x, pos.y - p.y, pos.z - p.z) < rad + 0.15) {
+      if (bolt.pierce) bolt.hitSet.add(pt);
+      hurtPtera(pt, bolt.damage || 1, bolt);
+      applySplash(pos, bolt, pt);
+      if (!bolt.pierce) return true;
+    }
+  }
+  for (const c of colliders) {
+    if (c.kind === "crate" || c.kind === "turret" || c.kind === "npc") continue;
+    if (Math.abs(pos.x - c.x) < c.hx + 0.1 && Math.abs(pos.z - c.z) < c.hz + 0.1 && pos.y < 4.5) {
+      burst(pos.clone(), bolt.color || 0xe8c6ff, bolt.id === 2 ? 10 : 6, bolt.id === 2 ? 4 : 3, 0.3);
+      applySplash(pos, bolt, null);
+      return true;
+    }
+  }
+  return false;
+}
+
+// --- collision / movement ---
+function resolveCircleBox(px, pz, r, c) {
+  const cx = Math.max(c.x - c.hx, Math.min(px, c.x + c.hx));
+  const cz = Math.max(c.z - c.hz, Math.min(pz, c.z + c.hz));
+  let dx = px - cx;
+  let dz = pz - cz;
+  const dist = Math.hypot(dx, dz);
+  if (dist === 0) {
+    // inside: push out on shortest axis
+    const ox = (c.hx + r) - Math.abs(px - c.x);
+    const oz = (c.hz + r) - Math.abs(pz - c.z);
+    if (ox < oz) px += Math.sign(px - c.x || 1) * ox;
+    else pz += Math.sign(pz - c.z || 1) * oz;
+    return { x: px, z: pz };
+  }
+  if (dist < r) {
+    const k = (r - dist) / dist;
+    px += dx * k;
+    pz += dz * k;
+  }
+  return { x: px, z: pz };
+}
+
+function collidePlayer(px, pz) {
+  for (const c of colliders) {
+    const out = resolveCircleBox(px, pz, PLAYER_RADIUS, c);
+    px = out.x;
+    pz = out.z;
+  }
+  px = Math.max(-WORLD_HALF + 0.8, Math.min(WORLD_HALF - 0.8, px));
+  pz = Math.max(-WORLD_HALF + 0.8, Math.min(WORLD_HALF - 0.8, pz));
+  return { x: px, z: pz };
+}
+
+function isSolidAt(x, z, r, ignoreCrates = false) {
+  for (const c of colliders) {
+    if (ignoreCrates && c.kind === "crate") continue;
+    const cx = Math.max(c.x - c.hx, Math.min(x, c.x + c.hx));
+    const cz = Math.max(c.z - c.hz, Math.min(z, c.z + c.hz));
+    if (Math.hypot(x - cx, z - cz) < r) return true;
+  }
+  return Math.abs(x) > WORLD_HALF - 0.8 || Math.abs(z) > WORLD_HALF - 0.8;
+}
+
+function angleDiff(a, b) {
+  let d = a - b;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+function hasLineOfSight(x1, z1, x2, z2) {
+  const dx = x2 - x1;
+  const dz = z2 - z1;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 0.25) return true;
+  const steps = Math.max(2, Math.ceil(dist / 0.45));
+  for (let i = 1; i < steps; i++) {
+    const tStep = i / steps;
+    const x = x1 + dx * tStep;
+    const z = z1 + dz * tStep;
+    for (const c of colliders) {
+      if (c.kind !== "house" && c.kind !== "tree" && c.kind !== "shrine") continue;
+      if (Math.abs(x - c.x) <= c.hx && Math.abs(z - c.z) <= c.hz) return false;
+    }
+  }
+  return true;
+}
+
+function canSeeTarget(d, tx, tz, dist, dx, dz) {
+  if (state !== "playing") return false;
+  const closeR = d.isBoss ? DINO_CLOSE_NOTICE + 2 : DINO_CLOSE_NOTICE;
+  if (dist <= closeR) return true;
+  if (dist > DINO_SIGHT) return false;
+  const bearing = Math.atan2(dx, dz);
+  if (Math.abs(angleDiff(bearing, d.heading)) > DINO_FOV_HALF) return false;
+  return hasLineOfSight(d.root.position.x, d.root.position.z, tx, tz);
+}
+
+function canSeePlayer(d, dist, dx, dz) {
+  return canSeeTarget(d, camera.position.x, camera.position.z, dist, dx, dz);
+}
+
+function pickBestTarget(d, requireSight) {
+  const candidates = [];
+  if (state === "playing") {
+    candidates.push({ kind: "player", turret: null, x: camera.position.x, z: camera.position.z });
+  }
+  for (const t of turrets) {
+    if (!t.alive) continue;
+    candidates.push({ kind: "turret", turret: t, x: t.x, z: t.z });
+  }
+  let best = null;
+  let bestDist = Infinity;
+  for (const c of candidates) {
+    const dx = c.x - d.root.position.x;
+    const dz = c.z - d.root.position.z;
+    const dist = Math.hypot(dx, dz);
+    if (requireSight && !canSeeTarget(d, c.x, c.z, dist, dx, dz)) continue;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = { ...c, dx, dz, dist };
+    }
+  }
+  return best;
+}
+
+function resolveDinoTarget(d) {
+  if (d.targetKind === "turret" && d.targetTurret && d.targetTurret.alive) {
+    const dx = d.targetTurret.x - d.root.position.x;
+    const dz = d.targetTurret.z - d.root.position.z;
+    return { kind: "turret", turret: d.targetTurret, x: d.targetTurret.x, z: d.targetTurret.z, dx, dz, dist: Math.hypot(dx, dz) };
+  }
+  const dx = camera.position.x - d.root.position.x;
+  const dz = camera.position.z - d.root.position.z;
+  return { kind: "player", turret: null, x: camera.position.x, z: camera.position.z, dx, dz, dist: Math.hypot(dx, dz) };
+}
+
+function startSpot(d, target = null) {
+  if (!d.alive) return;
+  if (target) {
+    d.targetKind = target.kind;
+    d.targetTurret = target.turret || null;
+  } else if (d.targetKind === "turret" && (!d.targetTurret || !d.targetTurret.alive)) {
+    d.targetKind = "player";
+    d.targetTurret = null;
+  }
+  if (d.mode === "telegraph" || d.mode === "charge") return;
+  // Easy: small dinos spot and chase but never shriek or charge. Boss still does.
+  if (difficulty === "easy" && !d.isBoss) {
+    d.mode = "hunt";
+    d.packDelay = 0;
+    d.chargeT = 0;
+    if (d.alertMark) d.alertMark.visible = false;
+    alertPack(d);
+    return;
+  }
+  d.mode = "telegraph";
+  d.telegraphT = (target && target.short)
+    ? randRange(0.32, 0.42)
+    : randRange(DINO_TELEGRAPH_MIN, DINO_TELEGRAPH_MAX);
+  d.chargeT = 0;
+  d.passedClose = false;
+  d.packDelay = 0;
+  if (d.alertMark) d.alertMark.visible = true;
+  shriekAt(d);
+  alertPack(d);
+}
+
+function alertPack(source) {
+  const sx = source.root.position.x;
+  const sz = source.root.position.z;
+  for (const d of dinos) {
+    if (!d.alive || d === source) continue;
+    if (d.mode === "telegraph" || d.mode === "charge" || d.mode === "hunt") continue;
+    const dist = Math.hypot(d.root.position.x - sx, d.root.position.z - sz);
+    if (dist < DINO_PACK_RADIUS) {
+      d.mode = "hunt";
+      d.targetKind = source.targetKind || "player";
+      d.targetTurret = source.targetTurret || null;
+      d.packDelay = 0.15 + Math.random() * 0.4;
+      if (d.alertMark) d.alertMark.visible = false;
+    }
+  }
+}
+
+function hurtDino(d, hitPos, damage = 1, source = null) {
+  if (!d.alive) return;
+  d.hp -= damage;
+  flashDino(d);
+  if (d.isBoss) updateBossBar();
+  const dx = d.root.position.x - (hitPos ? hitPos.x : camera.position.x);
+  const dz = d.root.position.z - (hitPos ? hitPos.z : camera.position.z);
+  const len = Math.hypot(dx, dz) || 1;
+  const kbMul = d.isBoss ? 0.22 : 1;
+  d.kbX = (dx / len) * DINO_KNOCKBACK * kbMul;
+  d.kbZ = (dz / len) * DINO_KNOCKBACK * kbMul;
+  d.staggerUntil = time + (d.isBoss ? 0.08 : DINO_STAGGER);
+  if (d.hp <= 0) {
+    killDino(d);
+    return;
+  }
+  aggroDino(d, source);
+}
+
+function aggroDino(d, source) {
+  if (!d || !d.alive) return;
+  if (source && source.fromTurret && source.turret && source.turret.alive) {
+    d.targetKind = "turret";
+    d.targetTurret = source.turret;
+  } else {
+    d.targetKind = "player";
+    d.targetTurret = null;
+  }
+  const tgt = { kind: d.targetKind, turret: d.targetTurret, short: true };
+  if (d.mode === "telegraph" || d.mode === "charge") return;
+  startSpot(d, tgt);
+}
+
+function steerDino(d, tx, tz, speed, dt, turnStyle, turnRate) {
+  const mx = tx - d.root.position.x;
+  const mz = tz - d.root.position.z;
+  const md = Math.hypot(mx, mz);
+  if (md > 0.04) {
+    const desired = Math.atan2(mx, mz);
+    const diff = angleDiff(desired, d.heading);
+    if (turnStyle === "max") {
+      d.heading += Math.sign(diff) * Math.min(Math.abs(diff), turnRate * dt);
+    } else {
+      d.heading += diff * Math.min(1, turnRate * dt);
+    }
+    const along = turnStyle === "max";
+    const vx = along ? Math.sin(d.heading) * speed * dt : (mx / md) * speed * dt;
+    const vz = along ? Math.cos(d.heading) * speed * dt : (mz / md) * speed * dt;
+    let nx = d.root.position.x + vx;
+    let nz = d.root.position.z + vz;
+    if (isSolidAt(nx, nz, 0.45 * d.scale, true)) {
+      if (!isSolidAt(d.root.position.x + vx, d.root.position.z, 0.45 * d.scale, true)) nz = d.root.position.z;
+      else if (!isSolidAt(d.root.position.x, d.root.position.z + vz, 0.45 * d.scale, true)) nx = d.root.position.x;
+      else if (d.mode === "charge" || d.mode === "hunt") {
+        nx = d.root.position.x - vz * 0.8;
+        nz = d.root.position.z + vx * 0.8;
+      } else {
+        pickWander(d);
+        nx = d.root.position.x;
+        nz = d.root.position.z;
+      }
+    }
+    d.root.position.x = Math.max(-WORLD_HALF + 1, Math.min(WORLD_HALF - 1, nx));
+    d.root.position.z = Math.max(-WORLD_HALF + 1, Math.min(WORLD_HALF - 1, nz));
+  }
+  d.root.rotation.y = d.heading;
+  return md;
+}
+
+function loadDifficulty() {
+  try {
+    const v = localStorage.getItem("dinoWandDifficulty");
+    if (v === "easy" || v === "hard") difficulty = v;
+  } catch (err) { /* file:// / private mode */ }
+}
+
+function refreshDifficultyUI() {
+  for (const btn of document.querySelectorAll(".mode-btn")) {
+    btn.classList.toggle("active", btn.dataset.mode === difficulty);
+  }
+  if (modeBadge) {
+    modeBadge.textContent = difficulty === "easy" ? "Easy" : "Hard";
+    modeBadge.dataset.mode = difficulty;
+  }
+}
+
+function setDifficulty(mode) {
+  if (mode !== "easy" && mode !== "hard") return;
+  difficulty = mode;
+  try { localStorage.setItem("dinoWandDifficulty", mode); } catch (err) { /* ignore */ }
+  refreshDifficultyUI();
+  if (difficulty === "easy") {
+    for (const d of dinos) {
+      if (!d.alive || d.isBoss) continue;
+      if (d.mode === "telegraph" || d.mode === "charge") {
+        d.mode = "hunt";
+        d.packDelay = 0;
+        if (d.alertMark) d.alertMark.visible = false;
+      }
+    }
+    for (const pt of pteras) {
+      if (!pt.alive || pt.falling) continue;
+      if (pt.mode === "telegraph" || pt.mode === "dive") {
+        pt.mode = "climb";
+        pt.cooldownT = 1.2;
+        pt.cruiseAlt = randRange(PTERA_ALT_MIN + 1, PTERA_ALT_MAX);
+      }
+    }
+  }
+}
+
+function bindDifficultyButtons() {
+  for (const btn of document.querySelectorAll(".mode-btn")) {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDifficulty(btn.dataset.mode);
+    });
+  }
+}
+
+// --- wand HUD / shrines ---
+function showToast(msg, dur = 2.2) {
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  toastTimer = dur;
+}
+
+function refreshWandBar() {
+  for (const slot of document.querySelectorAll(".wand-slot")) {
+    const id = Number(slot.dataset.slot);
+    const priceEl = slot.querySelector(".price");
+    if (id === 4) {
+      const has = turretStock > 0;
+      slot.classList.toggle("locked", !has);
+      slot.classList.toggle("unlocked", true);
+      slot.classList.toggle("active", activeWand === 4);
+      if (priceEl) {
+        priceEl.style.display = "block";
+        priceEl.textContent = has ? ("x" + turretStock) : ("0 · " + TURRET_PRICE + "c");
+      }
+      continue;
+    }
+    const def = WAND_DEFS[id - 1];
+    slot.classList.toggle("locked", !def.unlocked);
+    slot.classList.toggle("unlocked", def.unlocked);
+    slot.classList.toggle("active", id === activeWand);
+    if (priceEl) priceEl.textContent = def.unlocked ? "" : (def.price + " coins");
+  }
+}
+
+function trySelectWand(id) {
+  if (state !== "playing" && state !== "paused") return;
+  if (id === 4) {
+    if (turretStock <= 0) {
+      showToast("No turrets — buy at the Turrets shop (" + TURRET_PRICE + " coins)");
+      return;
+    }
+    if (activeWand === 4) return;
+    activeWand = 4;
+    switchAnim = 1;
+    for (const k of [1, 2, 3, 4]) if (wandModels[k]) wandModels[k].visible = (k === 4);
+    refreshWandBar();
+    beep(600, 0.07, "triangle", 0.04);
+    return;
+  }
+  const def = WAND_DEFS[id - 1];
+  if (!def) return;
+  if (!def.unlocked) {
+    showToast(def.name + " not found yet — buy it at a shrine");
+    return;
+  }
+  if (activeWand === id) return;
+  activeWand = id;
+  switchAnim = 1;
+  for (const k of [1, 2, 3, 4]) if (wandModels[k]) wandModels[k].visible = (k === id);
+  refreshWandBar();
+  beep(520 + id * 80, 0.07, "triangle", 0.04);
+}
+
+function nearbyShrine() {
+  let best = null, bestD = SHOP_SHRINE_RANGE;
+  for (const s of shrines) {
+    const d = Math.hypot(camera.position.x - s.pedX, camera.position.z - s.pedZ);
+    if (d < bestD) { best = s; bestD = d; }
+  }
+  return best;
+}
+
+function nearbyShopkeeper() {
+  if (!shopkeeper) return false;
+  return Math.hypot(camera.position.x - shopkeeper.x, camera.position.z - shopkeeper.z) < SHOP_NPC_RANGE;
+}
+
+function nearbyHealer() {
+  if (!healer) return false;
+  return Math.hypot(camera.position.x - healer.x, camera.position.z - healer.z) < SHOP_NPC_RANGE;
+}
+
+function inShopZone() {
+  if (state !== "playing") return false;
+  if (nearbyShopkeeper() || nearbyHealer()) return true;
+  return !!nearbyShrine();
+}
+
+function isCombatFrozen() {
+  return shopSafe || time < shopLeaveGraceUntil;
+}
+
+function tintMob(mob, on) {
+  if (!mob || !mob.mats || !mob.orig) return;
+  if (mob.flashUntil && time < mob.flashUntil) return;
+  const tint = new THREE.Color(SAFE_TINT);
+  for (let i = 0; i < mob.mats.length; i++) {
+    if (on) mob.mats[i].color.copy(mob.orig[i]).lerp(tint, 0.48);
+    else mob.mats[i].color.copy(mob.orig[i]);
+  }
+}
+
+function reacquireAfterShop() {
+  for (const d of dinos) {
+    if (!d.alive) continue;
+    if (d.mode === "charge" || d.mode === "telegraph") {
+      if (difficulty === "easy" && !d.isBoss) {
+        d.mode = "hunt";
+        d.packDelay = 0;
+        d.chargeT = 0;
+        d.telegraphT = 0;
+        if (d.alertMark) d.alertMark.visible = false;
+      } else {
+        d.mode = "telegraph";
+        d.telegraphT = Math.max(0.45, d.telegraphT || 0);
+        d.chargeT = 0;
+        d.passedClose = false;
+        if (d.alertMark) d.alertMark.visible = true;
+      }
+    }
+  }
+  for (const pt of pteras) {
+    if (!pt.alive || pt.falling) continue;
+    if (pt.mode === "dive" || pt.mode === "telegraph") {
+      pt.mode = "climb";
+      pt.cooldownT = Math.max(pt.cooldownT, 0.6);
+      pt.cruiseAlt = randRange(PTERA_ALT_MIN + 1, PTERA_ALT_MAX);
+      pt.freezeY = null;
+    }
+  }
+}
+
+function maybeTriggerBoss() {
+  if (bossSpawned || dinosDefeated < BOSS_KILLS_REQ || state !== "playing") return;
+  if (shopSafe) {
+    bossPending = true;
+    return;
+  }
+  bossPending = false;
+  triggerBoss();
+}
+
+function updateShopSafety() {
+  const inside = inShopZone();
+  if (inside && !shopSafe) {
+    shopSafe = true;
+    if (safeHintEl) safeHintEl.classList.remove("hidden");
+  } else if (!inside && shopSafe) {
+    shopSafe = false;
+    shopLeaveGraceUntil = time + SHOP_LEAVE_GRACE;
+    if (safeHintEl) safeHintEl.classList.add("hidden");
+    reacquireAfterShop();
+    if (bossPending) maybeTriggerBoss();
+  }
+  for (const d of dinos) if (d.alive) tintMob(d, shopSafe);
+  for (const pt of pteras) if (pt.alive && !pt.falling) tintMob(pt, shopSafe);
+}
+
+function updateHeartsHUD() {
+  if (!heartsEl) return;
+  heartsEl.innerHTML = "";
+  for (let i = 0; i < maxHearts; i++) {
+    const s = document.createElement("span");
+    s.className = "hud-heart" + (i < hearts ? "" : " empty");
+    heartsEl.appendChild(s);
+  }
+  heartsEl.classList.toggle("flicker", state === "playing" && time < invulnUntil);
+}
+
+function tryBuyHeart() {
+  if (maxHearts >= HEART_MAX) {
+    showToast("Already at the maximum of " + HEART_MAX + " hearts");
+    beep(160, 0.12, "square", 0.04, 90);
+    return;
+  }
+  if (coins < HEART_PRICE) {
+    showToast("Need " + HEART_PRICE + " coins for a heart container");
+    beep(160, 0.12, "square", 0.04, 90);
+    return;
+  }
+  coins -= HEART_PRICE;
+  coinEl.textContent = String(coins);
+  maxHearts += 1;
+  hearts = maxHearts;
+  updateHeartsHUD();
+  showToast("Heart container! (" + hearts + "/" + maxHearts + ")");
+  beep(620, 0.1, "triangle", 0.05, 880);
+  beep(880, 0.14, "sine", 0.05, 1240);
+}
+
+function tryBuyNearby() {
+  if (state !== "playing") return;
+  if (nearbyHealer()) {
+    tryBuyHeart();
+    return;
+  }
+  if (nearbyShopkeeper()) {
+    if (coins < TURRET_PRICE) {
+      showToast("Need " + TURRET_PRICE + " coins for a turret");
+      beep(160, 0.12, "square", 0.04, 90);
+      return;
+    }
+    coins -= TURRET_PRICE;
+    coinEl.textContent = String(coins);
+    turretStock += 1;
+    refreshWandBar();
+    showToast("Bought a turret! Press 4 to place (Owned: " + turretStock + ")");
+    beep(580, 0.09, "triangle", 0.05, 880);
+    beep(820, 0.12, "triangle", 0.04, 1180);
+    return;
+  }
+  const s = nearbyShrine();
+  if (!s || s.bought) return;
+  const def = WAND_DEFS[s.kind - 1];
+  if (def.unlocked) return;
+  if (coins < s.price) {
+    showToast("Need " + s.price + " coins");
+    beep(160, 0.12, "square", 0.04, 90);
+    return;
+  }
+  coins -= s.price;
+  coinEl.textContent = String(coins);
+  def.unlocked = true;
+  s.bought = true;
+  s.display.visible = false;
+  s.label.visible = false;
+  refreshWandBar();
+  showToast("Picked up " + def.name + " — press " + s.kind);
+  beep(660, 0.1, "triangle", 0.05, 990);
+  beep(880, 0.14, "square", 0.04, 1320);
+  trySelectWand(s.kind);
+}
+
+function resetWands() {
+  activeWand = 1;
+  turretStock = 0;
+  wandReadyAt = [0, 0, 0, 0];
+  switchAnim = 0;
+  WAND_DEFS[1].unlocked = false;
+  WAND_DEFS[2].unlocked = false;
+  WAND_DEFS[0].unlocked = true;
+  for (const k of [1, 2, 3, 4]) if (wandModels[k]) wandModels[k].visible = (k === 1);
+  turretGhost.root.visible = false;
+  for (const s of shrines) {
+    s.bought = false;
+    s.display.visible = true;
+    s.label.visible = true;
+  }
+  for (const tr of turrets) {
+    scene.remove(tr.model.root);
+    const idx = colliders.indexOf(tr.col);
+    if (idx >= 0) colliders.splice(idx, 1);
+  }
+  turrets.length = 0;
+  refreshWandBar();
+  promptEl.classList.add("hidden");
+  cooldownRing.style.opacity = "0";
+}
+
+function getTurretPlacement() {
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  dir.y = 0;
+  if (dir.lengthSq() < 1e-6) dir.set(0, 0, -1);
+  dir.normalize();
+  const x = Math.max(-WORLD_HALF + 1.5, Math.min(WORLD_HALF - 1.5, camera.position.x + dir.x * 2.6));
+  const z = Math.max(-WORLD_HALF + 1.5, Math.min(WORLD_HALF - 1.5, camera.position.z + dir.z * 2.6));
+  const heading = Math.atan2(dir.x, dir.z);
+  let valid = Math.hypot(x - camera.position.x, z - camera.position.z) >= 1.2;
+  if (valid && isSolidAt(x, z, 0.72)) valid = false;
+  if (valid) {
+    for (const d of dinos) {
+      if (!d.alive) continue;
+      if (Math.hypot(x - d.root.position.x, z - d.root.position.z) < 1.15 * d.scale) { valid = false; break; }
+    }
+  }
+  return { x, z, heading, valid };
+}
+
+function placeTurretAt(x, z, heading) {
+  const model = createTurretModel(false);
+  model.root.position.set(x, 0, z);
+  model.root.rotation.y = heading;
+  scene.add(model.root);
+  const col = addCollider("turret", x, z, 0.48, 0.48);
+  const tr = {
+    x, z, heading,
+    headYaw: 0,
+    hp: TURRET_HP,
+    alive: true,
+    fireAt: time + 0.35,
+    flashUntil: 0,
+    coneAge: 0,
+    recoil: 0,
+    model,
+    col,
+  };
+  turrets.push(tr);
+  beep(320, 0.08, "square", 0.05, 480);
+  return tr;
+}
+
+function tryPlaceTurret() {
+  if (state !== "playing" || activeWand !== 4 || turretStock <= 0) return;
+  const spot = getTurretPlacement();
+  if (!spot.valid) {
+    showToast("Can't place turret there", 1.2);
+    beep(150, 0.08, "square", 0.04, 100);
+    return;
+  }
+  placeTurretAt(spot.x, spot.z, spot.heading);
+  turretStock -= 1;
+  if (turretStock <= 0) {
+    activeWand = 1;
+    switchAnim = 1;
+    for (const k of [1, 2, 3, 4]) if (wandModels[k]) wandModels[k].visible = (k === 1);
+    turretGhost.root.visible = false;
+  }
+  refreshWandBar();
+}
+
+function damageTurret(tr, dmg = 1) {
+  if (!tr.alive) return;
+  tr.hp -= dmg;
+  tr.flashUntil = time + 0.14;
+  for (const m of tr.model.mats) m.color.set(0xff4433);
+  burst(new THREE.Vector3(tr.x, 0.65, tr.z), 0x8ea0b2, 8, 4.5, 0.45);
+  if (tr.hp <= 0) {
+    tr.alive = false;
+    scene.remove(tr.model.root);
+    const idx = colliders.indexOf(tr.col);
+    if (idx >= 0) colliders.splice(idx, 1);
+    burst(new THREE.Vector3(tr.x, 0.55, tr.z), 0x6f7f8e, 18, 6.5, 0.85);
+    burst(new THREE.Vector3(tr.x, 0.7, tr.z), 0x44ffaa, 8, 5, 0.65);
+    playTurretCrunch(true);
+  } else {
+    playTurretCrunch(false);
+  }
+}
+
+function updateTurrets(dt) {
+  // Ghost preview when slot 4 selected
+  if (state === "playing" && activeWand === 4 && turretStock > 0) {
+    const spot = getTurretPlacement();
+    turretGhost.root.visible = true;
+    turretGhost.root.position.set(spot.x, 0, spot.z);
+    turretGhost.root.rotation.y = spot.heading;
+    const col = spot.valid ? 0x44ff77 : 0xff4444;
+    for (const m of turretGhost.mats) m.color.setHex(col);
+    turretGhost.coneMat.color.setHex(col);
+  } else {
+    turretGhost.root.visible = false;
+  }
+
+  for (const tr of turrets) {
+    if (!tr.alive) continue;
+    tr.coneAge += dt;
+    tr.model.coneMat.opacity = tr.coneAge < 2.5 ? 0.28 : 0.08;
+    if (time > tr.flashUntil) {
+      tr.model.mats[0].color.setHex(0x49535e);
+      tr.model.mats[1].color.setHex(0x2c333b);
+      tr.model.mats[2].color.setHex(0x6f7f8e);
+    }
+    tr.recoil = Math.max(0, tr.recoil - dt * 6);
+    tr.model.head.position.z = -tr.recoil * 0.08;
+
+    if (state !== "playing") continue;
+
+    // Pick nearest dino within 60-degree cone (+-30 deg) & 30 units & LOS
+    let best = null;
+    let bestD = TURRET_RANGE;
+    let bestRel = 0;
+    const candidates = [];
+    for (const d of dinos) if (d.alive) candidates.push(d);
+    for (const pt of pteras) if (pt.alive && !pt.falling) candidates.push(pt);
+    for (const d of candidates) {
+      const dx = d.root.position.x - tr.x;
+      const dz = d.root.position.z - tr.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > bestD) continue;
+      const ang = Math.atan2(dx, dz);
+      const rel = angleDiff(ang, tr.heading);
+      if (Math.abs(rel) > TURRET_FOV_HALF) continue;
+      if (!hasLineOfSight(tr.x, tr.z, d.root.position.x, d.root.position.z)) continue;
+      best = d;
+      bestD = dist;
+      bestRel = rel;
+    }
+
+    const desiredYaw = best ? bestRel : 0;
+    tr.headYaw += (desiredYaw - tr.headYaw) * Math.min(1, dt * 10);
+    tr.headYaw = Math.max(-TURRET_FOV_HALF, Math.min(TURRET_FOV_HALF, tr.headYaw));
+    tr.model.head.rotation.y = tr.headYaw;
+
+    if (best && time >= tr.fireAt) {
+      const origin = new THREE.Vector3();
+      tr.model.muzzle.getWorldPosition(origin);
+      const targetPos = new THREE.Vector3(best.root.position.x, best.aimY != null ? best.aimY : 1.05 * best.scale, best.root.position.z);
+      const dir = targetPos.sub(origin).normalize();
+      spawnBolt(origin, dir, {
+        id: 5, speed: 34, life: 1.05, scale: 0.9,
+        damage: 1, splash: 0, splashDamage: 0,
+        color: 0x44ffaa, light: 0x22dd88, fromTurret: true, turret: tr,
+      });
+      tr.fireAt = time + TURRET_FIRE_GAP;
+      tr.recoil = 1;
+      beep(780, 0.06, "triangle", 0.035, 340);
+    }
+  }
+}
+
+function updateShopNpc(npc, dt, spin) {
+  if (!npc) return;
+  npc.mesh.position.y = Math.sin(time * 2.2) * 0.04;
+  if (spin) spin.rotation.y += dt * 1.6;
+  const dx = camera.position.x - npc.x;
+  const dz = camera.position.z - npc.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 10) {
+    const desired = Math.atan2(dx, dz);
+    npc.mesh.rotation.y += angleDiff(desired, npc.mesh.rotation.y) * Math.min(1, dt * 5);
+  }
+}
+
+function updateShopkeeper(dt) {
+  updateShopNpc(shopkeeper, dt, shopkeeper && shopkeeper.miniHead);
+  updateShopNpc(healer, dt, healer && healer.display);
+}
+
+function updateShrines(dt) {
+  for (const s of shrines) {
+    if (!s.bought && s.display) {
+      s.display.rotation.y += dt * 0.9;
+      s.display.position.y = 1.45 + Math.sin(time * 2.1) * 0.1;
+      s.light.intensity = 2.1 + Math.sin(time * 3) * 0.5;
+      s.moteT -= dt;
+      if (s.moteT <= 0) {
+        spawnShrineMote(s);
+        s.moteT = 0.16;
+      }
+    } else if (s.light) {
+      s.light.intensity = 0.6;
+    }
+  }
+  for (let i = shrineMotes.length - 1; i >= 0; i--) {
+    const m = shrineMotes[i];
+    m.life -= dt;
+    m.mesh.position.y += m.vy * dt;
+    m.mesh.material.opacity = Math.max(0, m.life / m.max);
+    if (m.life <= 0) {
+      scene.remove(m.mesh);
+      m.mesh.material.dispose();
+      shrineMotes.splice(i, 1);
+    }
+  }
+
+  if (state === "playing") {
+    const s = nearbyShrine();
+    if (nearbyHealer()) {
+      if (maxHearts >= HEART_MAX) {
+        promptEl.textContent = "Already at the maximum of " + HEART_MAX + " hearts";
+        promptEl.classList.add("short");
+      } else {
+        const afford = coins >= HEART_PRICE;
+        promptEl.textContent = afford
+          ? ("Press E to buy a heart container (" + HEART_PRICE + " coins)")
+          : ("Need " + HEART_PRICE + " coins for a heart container");
+        promptEl.classList.toggle("short", !afford);
+      }
+      promptEl.classList.remove("hidden");
+    } else if (nearbyShopkeeper()) {
+      const afford = coins >= TURRET_PRICE;
+      promptEl.textContent = afford
+        ? ("Press E to buy a turret (" + TURRET_PRICE + " coins)")
+        : ("Need " + TURRET_PRICE + " coins for a turret");
+      promptEl.classList.toggle("short", !afford);
+      promptEl.classList.remove("hidden");
+    } else if (s && !s.bought) {
+      const def = WAND_DEFS[s.kind - 1];
+      const afford = coins >= s.price;
+      promptEl.textContent = afford
+        ? ("Press E to buy " + def.name + " for " + s.price + " coins")
+        : ("Need " + s.price + " coins");
+      promptEl.classList.toggle("short", !afford);
+      promptEl.classList.remove("hidden");
+    } else {
+      promptEl.classList.add("hidden");
+    }
+  } else {
+    promptEl.classList.add("hidden");
+  }
+}
+
+// --- game state ---
+function show(el) { el.classList.remove("hidden"); }
+function hide(el) { el.classList.add("hidden"); }
+
+function startPlay(lock = true) {
+  ensureAudio();
+  state = "playing";
+  hide(overlayStart);
+  hide(overlayDeath);
+  hide(overlayVictory);
+  hud.style.visibility = "visible";
+  shootLockUntil = performance.now() + 250;
+  if (lock) requestLock();
+}
+
+function requestLock() {
+  const el = renderer.domElement;
+  if (el.requestPointerLock) el.requestPointerLock();
+}
+
+function playEatGrowl() {
+  ensureAudio();
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const dur = 1.35;
+
+  const osc = audioCtx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(118, t0);
+  osc.frequency.exponentialRampToValueAtTime(62, t0 + dur);
+
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(420, t0);
+  lp.frequency.exponentialRampToValueAtTime(160, t0 + dur);
+  lp.Q.value = 0.8;
+
+  const amp = audioCtx.createGain();
+  amp.gain.setValueAtTime(0.0001, t0);
+  amp.gain.exponentialRampToValueAtTime(0.2, t0 + 0.07);
+  amp.gain.setValueAtTime(0.16, t0 + 0.15);
+  amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+  const lfo = audioCtx.createOscillator();
+  lfo.type = "sine";
+  lfo.frequency.setValueAtTime(8, t0);
+  lfo.frequency.linearRampToValueAtTime(3.5, t0 + dur);
+  const lfoGain = audioCtx.createGain();
+  lfoGain.gain.value = 0.07;
+  lfo.connect(lfoGain);
+  lfoGain.connect(amp.gain);
+
+  osc.connect(lp).connect(amp).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.05);
+  lfo.start(t0);
+  lfo.stop(t0 + dur + 0.05);
+
+  const nLen = Math.floor(audioCtx.sampleRate * dur);
+  const buf = audioCtx.createBuffer(1, nLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < nLen; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const nlp = audioCtx.createBiquadFilter();
+  nlp.type = "lowpass";
+  nlp.frequency.setValueAtTime(280, t0);
+  nlp.frequency.exponentialRampToValueAtTime(90, t0 + dur);
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(0.0001, t0);
+  ng.gain.exponentialRampToValueAtTime(0.14, t0 + 0.06);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(nlp).connect(ng).connect(audioCtx.destination);
+  src.start(t0);
+  src.stop(t0 + dur + 0.05);
+}
+
+function formatTime(sec) {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m + ":" + String(r).padStart(2, "0");
+}
+
+function startBloodDrip() {
+  if (bloodAnim) cancelAnimationFrame(bloodAnim);
+  const w = bloodCanvas.width = window.innerWidth;
+  const h = bloodCanvas.height = window.innerHeight;
+  const ctx = bloodCanvas.getContext("2d");
+  bloodOverlay.classList.remove("hidden");
+
+  const cols = 52;
+  const colW = w / cols;
+  const drops = Array.from({ length: cols }, (_, i) => ({
+    x: i * colW,
+    w: colW + 2,
+    speed: h * (0.58 + Math.random() * 0.55),
+    delay: Math.random() * 0.28,
+    len: 14 + Math.random() * 22,
+  }));
+  const tStart = performance.now();
+  overlayDeath.classList.add("fading");
+  show(overlayDeath);
+
+  let panelShown = false;
+  function tick(now) {
+    if (state !== "dead") return;
+    const elapsed = (now - tStart) / 1000;
+    ctx.clearRect(0, 0, w, h);
+
+    // base top pool
+    const poolH = Math.min(h * 0.14, elapsed * h * 0.25);
+    ctx.fillStyle = "rgba(130, 8, 12, 0.92)";
+    ctx.fillRect(0, 0, w, poolH);
+
+    for (let i = 0; i < drops.length; i++) {
+      const d = drops[i];
+      const dt = Math.max(0, elapsed - d.delay);
+      const y = Math.min(h + 40, dt * d.speed);
+      if (y <= 0) continue;
+      const grad = ctx.createLinearGradient(0, 0, 0, y);
+      grad.addColorStop(0, "rgba(110, 5, 9, 0.94)");
+      grad.addColorStop(0.75, "rgba(160, 12, 16, 0.93)");
+      grad.addColorStop(1, "rgba(195, 22, 24, 0.96)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(d.x, 0, d.w, y);
+      ctx.beginPath();
+      ctx.arc(d.x + d.w * 0.5, y, d.w * 0.52, 0, Math.PI);
+      ctx.fill();
+      if (i % 3 === 0) {
+        ctx.fillStyle = "rgba(70, 2, 4, 0.45)";
+        ctx.fillRect(d.x + d.w * 0.3, 0, d.w * 0.22, Math.max(0, y - d.len));
+      }
+    }
+
+    if (!panelShown && elapsed >= 1.15) {
+      panelShown = true;
+      overlayDeath.classList.remove("fading");
+    }
+    if (elapsed < 2.2) {
+      bloodAnim = requestAnimationFrame(tick);
+    } else {
+      overlayDeath.classList.remove("fading");
+    }
+  }
+  bloodAnim = requestAnimationFrame(tick);
+}
+
+function playHurtSound() {
+  ensureAudio();
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(320, t0);
+  osc.frequency.exponentialRampToValueAtTime(110, t0 + 0.22);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.14, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.24);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.26);
+  const nLen = Math.floor(audioCtx.sampleRate * 0.2);
+  const buf = audioCtx.createBuffer(1, nLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < nLen; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = "bandpass";
+  hp.frequency.value = 700;
+  hp.Q.value = 0.8;
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(0.0001, t0);
+  ng.gain.exponentialRampToValueAtTime(0.12, t0 + 0.015);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+  src.connect(hp).connect(ng).connect(audioCtx.destination);
+  src.start(t0);
+  src.stop(t0 + 0.22);
+}
+
+function applyPlayerKnockback(fromX, fromZ, strength = 9.5) {
+  const dx = camera.position.x - fromX;
+  const dz = camera.position.z - fromZ;
+  const len = Math.hypot(dx, dz) || 1;
+  playerKbX = (dx / len) * strength;
+  playerKbZ = (dz / len) * strength;
+}
+
+function breakOffAttacker(attacker) {
+  if (!attacker) return;
+  const px = camera.position.x;
+  const pz = camera.position.z;
+  if (attacker.root && attacker.legs) {
+    const dx = attacker.root.position.x - px;
+    const dz = attacker.root.position.z - pz;
+    const len = Math.hypot(dx, dz) || 1;
+    attacker.kbX = (dx / len) * 10.5;
+    attacker.kbZ = (dz / len) * 10.5;
+    attacker.staggerUntil = time + 0.45;
+    attacker.mode = "recover";
+    attacker.cooldownT = 1.25;
+    attacker.chargeT = 0;
+    attacker.telegraphT = 0;
+    if (attacker.alertMark) attacker.alertMark.visible = false;
+  } else if (attacker.root && attacker.wings) {
+    attacker.mode = "climb";
+    attacker.cooldownT = PTERA_COOLDOWN + 0.4;
+    attacker.cruiseAlt = randRange(PTERA_ALT_MIN + 2, PTERA_ALT_MAX);
+  }
+}
+
+function takeHit(cause, attacker) {
+  if (state !== "playing") return false;
+  if (isCombatFrozen()) return false;
+  if (time < invulnUntil) return false;
+  if (hearts > 1) {
+    hearts -= 1;
+    invulnUntil = time + HURT_INVULN;
+    hurtFlashUntil = time + 0.32;
+    if (hurtFlashEl) {
+      hurtFlashEl.classList.remove("hidden");
+      hurtFlashEl.classList.add("show");
+    }
+    updateHeartsHUD();
+    playHurtSound();
+    const ax = attacker && attacker.root ? attacker.root.position.x : camera.position.x;
+    const az = attacker && attacker.root ? attacker.root.position.z : camera.position.z;
+    applyPlayerKnockback(ax, az, 9.5);
+    breakOffAttacker(attacker);
+    return true;
+  }
+  hearts = 0;
+  updateHeartsHUD();
+  onDeath(cause);
+  return false;
+}
+
+function onDeath(cause) {
+  if (state === "dead" || state === "victory") return;
+  state = "dead";
+  turretGhost.root.visible = false;
+  if (cause === "ptera") {
+    let nearest = null, nd = 1e9;
+    for (const pt of pteras) {
+      if (pt.finished) continue;
+      const d = Math.hypot(
+        pt.root.position.x - camera.position.x,
+        pt.root.position.y - camera.position.y,
+        pt.root.position.z - camera.position.z
+      );
+      if (d < nd) { nd = d; nearest = pt; }
+    }
+    if (nearest) screechPtera(nearest);
+    else playEatGrowl();
+  } else {
+    playEatGrowl();
+  }
+  deathCoinsEl.textContent = String(coinsCollected);
+  if (deathDinosEl) deathDinosEl.textContent = String(dinosDefeated);
+  if (document.exitPointerLock) document.exitPointerLock();
+  startBloodDrip();
+}
+
+function onVictory() {
+  if (state === "victory" || state === "dead") return;
+  state = "victory";
+  turretGhost.root.visible = false;
+  winCoinsEl.textContent = String(coinsCollected);
+  winDinosEl.textContent = String(dinosDefeated);
+  winTimeEl.textContent = formatTime(runTime);
+  show(overlayVictory);
+  if (document.exitPointerLock) document.exitPointerLock();
+  beep(523, 0.14, "triangle", 0.06);
+  setTimeout(() => beep(659, 0.14, "triangle", 0.06), 120);
+  setTimeout(() => beep(784, 0.28, "triangle", 0.07, 1046), 240);
+}
+
+function resetGame() {
+  if (bloodAnim) cancelAnimationFrame(bloodAnim);
+  bloodAnim = null;
+  bloodOverlay.classList.add("hidden");
+  overlayDeath.classList.remove("fading");
+  hide(overlayDeath);
+  hide(overlayVictory);
+  coins = 0;
+  coinsCollected = 0;
+  dinosDefeated = 0;
+  hearts = 1;
+  maxHearts = 1;
+  invulnUntil = 0;
+  hurtFlashUntil = 0;
+  playerKbX = 0;
+  playerKbZ = 0;
+  shopSafe = false;
+  shopLeaveGraceUntil = 0;
+  bossPending = false;
+  if (safeHintEl) safeHintEl.classList.add("hidden");
+  if (hurtFlashEl) {
+    hurtFlashEl.classList.remove("show");
+    hurtFlashEl.classList.add("hidden");
+  }
+  runTime = 0;
+  victoryAt = 0;
+  bossSpawned = false;
+  activeBoss = null;
+  bossBarEl.classList.add("hidden");
+  coinEl.textContent = "0";
+  updateDinoCounter();
+  updateHeartsHUD();
+  yaw = 0;
+  pitch = 0;
+  bobTime = 0;
+  wandRecoil = 0;
+  flashEnergy = 0;
+  time = 0;
+  resetWands();
+  toastTimer = 0;
+  toastEl.classList.remove("show");
+  dinoSpawnTimer = 14;
+  camera.position.set(0, PLAYER_EYE, 8);
+  camera.rotation.set(0, 0, 0);
+
+  for (const b of bolts) scene.remove(b.mesh);
+  bolts.length = 0;
+  for (const c of coins3d) scene.remove(c.mesh);
+  coins3d.length = 0;
+  for (const p of particles) scene.remove(p.mesh);
+  particles.length = 0;
+
+  for (const crate of crates) {
+    if (!crate.alive) {
+      scene.add(crate.mesh);
+      crate.alive = true;
+      if (!colliders.includes(crate.col)) colliders.push(crate.col);
+    }
+    crate.respawnAt = 0;
+  }
+  // spawn extras if some were never placed? keep existing set
+  while (crates.filter((c) => c.alive).length < 22) spawnCrate();
+
+  for (const d of dinos) {
+    if (d.root.parent) scene.remove(d.root);
+  }
+  dinos.length = 0;
+  clearPteras();
+  for (let i = 0; i < 4; i++) spawnDino(false);
+
+  startPlay(true);
+}
+
+// initial dinos
+for (let i = 0; i < 4; i++) spawnDino(false);
+
+// --- input ---
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.Shift = true;
+  if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  if (e.code === "Digit1" || e.code === "Numpad1") trySelectWand(1);
+  if (e.code === "Digit2" || e.code === "Numpad2") trySelectWand(2);
+  if (e.code === "Digit3" || e.code === "Numpad3") trySelectWand(3);
+  if (e.code === "Digit4" || e.code === "Numpad4") trySelectWand(4);
+  if (e.code === "KeyE") tryBuyNearby();
+});
+window.addEventListener("keyup", (e) => {
+  keys[e.code] = false;
+  if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.Shift = false;
+});
+window.addEventListener("blur", () => {
+  for (const k of Object.keys(keys)) keys[k] = false;
+});
+
+document.addEventListener("mousemove", (e) => {
+  if (state !== "playing") return;
+  if (document.pointerLockElement !== renderer.domElement) return;
+  yaw -= e.movementX * 0.0022;
+  pitch -= e.movementY * 0.0022;
+  const lim = Math.PI / 2 - 0.08;
+  if (pitch > lim) pitch = lim;
+  if (pitch < -lim) pitch = -lim;
+});
+
+renderer.domElement.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  if (state === "playing" && document.pointerLockElement === renderer.domElement) {
+    if (activeWand === 4) tryPlaceTurret();
+    else shootWand();
+  }
+});
+
+btnStart.addEventListener("click", () => startPlay(true));
+btnAgain.addEventListener("click", () => resetGame());
+btnWinAgain.addEventListener("click", () => resetGame());
+
+document.addEventListener("pointerlockchange", () => {
+  if (document.pointerLockElement === renderer.domElement) return;
+  if (state === "playing") {
+    state = "paused";
+    // reuse start overlay as pause
+    overlayStart.querySelector("h1").textContent = "PAUSED";
+    overlayStart.querySelector(".tag").textContent = "Click to keep exploring";
+    btnStart.textContent = "Resume";
+    show(overlayStart);
+  }
+});
+
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// --- update ---
+const clock = new THREE.Clock();
+const tmpDir = new THREE.Vector3();
+const tmpRight = new THREE.Vector3();
+const tmpMove = new THREE.Vector3();
+
+function updatePlayer(dt) {
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+  camera.rotation.z = 0;
+
+  if (state !== "playing") {
+    camera.position.y = PLAYER_EYE;
+    return;
+  }
+
+  camera.getWorldDirection(tmpDir);
+  tmpDir.y = 0;
+  if (tmpDir.lengthSq() < 1e-6) tmpDir.set(0, 0, -1);
+  tmpDir.normalize();
+  tmpRight.crossVectors(tmpDir, new THREE.Vector3(0, 1, 0)).normalize();
+
+  tmpMove.set(0, 0, 0);
+  if (keys.KeyW) tmpMove.add(tmpDir);
+  if (keys.KeyS) tmpMove.sub(tmpDir);
+  if (keys.KeyA) tmpMove.sub(tmpRight);
+  if (keys.KeyD) tmpMove.add(tmpRight);
+
+  const moving = tmpMove.lengthSq() > 0;
+  if (moving) tmpMove.normalize();
+  const running = !!(keys.Shift && moving);
+  const speed = running ? RUN_SPEED : WALK_SPEED;
+  let vx = moving ? tmpMove.x * speed : 0;
+  let vz = moving ? tmpMove.z * speed : 0;
+  vx += playerKbX;
+  vz += playerKbZ;
+  if (vx || vz) {
+    const resolved = collidePlayer(camera.position.x + vx * dt, camera.position.z + vz * dt);
+    camera.position.x = resolved.x;
+    camera.position.z = resolved.z;
+  }
+  if (moving) bobTime += dt * (running ? 11 : 7.5);
+  else bobTime += dt * 2;
+  playerKbX *= Math.max(0, 1 - dt * 6.5);
+  playerKbZ *= Math.max(0, 1 - dt * 6.5);
+  if (Math.hypot(playerKbX, playerKbZ) < 0.35) { playerKbX = 0; playerKbZ = 0; }
+  const bob = moving ? Math.sin(bobTime * 2) * 0.055 : Math.sin(time * 1.5) * 0.01;
+  camera.position.y = PLAYER_EYE + bob;
+
+  if (hurtFlashEl) {
+    if (time < hurtFlashUntil) {
+      hurtFlashEl.classList.remove("hidden");
+      hurtFlashEl.classList.add("show");
+    } else if (hurtFlashEl.classList.contains("show")) {
+      hurtFlashEl.classList.remove("show");
+    }
+  }
+  if (heartsEl) heartsEl.classList.toggle("flicker", time < invulnUntil);
+}
+
+function updateWand(dt) {
+  wandRecoil = Math.max(0, wandRecoil - dt * 7);
+  flashEnergy = Math.max(0, flashEnergy - dt * 8);
+  switchAnim = Math.max(0, switchAnim - dt * 6);
+  const dip = Math.sin(switchAnim * Math.PI) * 0.22;
+  wandRig.position.set(
+    0.34,
+    -0.28 - wandRecoil * 0.05 - dip,
+    -0.48 + wandRecoil * 0.1
+  );
+  wandRig.rotation.set(0.18 + wandRecoil * 0.25 + dip * 0.4, 0.28, 0.12);
+
+  if (activeWand === 4) {
+    heldTurret.head.rotation.y = Math.sin(time * 2) * 0.25;
+    muzzleLight.intensity = 0;
+  } else {
+    const vm = activeViewmodel();
+    const def = WAND_DEFS[activeWand - 1];
+    const cooling = def.id === 2 && time < wandReadyAt[2];
+    const dim = cooling ? 0.18 : 1;
+    const pulse = (vm.userData.baseEmissive * dim) * (0.85 + Math.sin(time * 6) * 0.2) + flashEnergy * 1.2;
+    vm.userData.crystalMat.emissiveIntensity = pulse;
+    vm.userData.crystal.rotation.z = time * 1.5;
+    vm.scale.setScalar(cooling ? 0.96 : 1);
+    muzzleLight.color.setHex(def.light);
+    muzzleLight.intensity = flashEnergy * (def.id === 2 ? 6 : 4.5);
+  }
+
+  // cooldown UI
+  const heavy = WAND_DEFS[1];
+  const remain = wandReadyAt[2] - time;
+  const slot2 = document.querySelector('.wand-slot[data-slot="2"] .cd-fill');
+  if (heavy.unlocked && remain > 0) {
+    const p = Math.max(0, Math.min(1, remain / heavy.fireGap));
+    if (slot2) slot2.style.height = (p * 100) + "%";
+    if (activeWand === 2) {
+      cooldownRing.style.opacity = "1";
+      cooldownRing.style.background = `conic-gradient(rgba(255,110,40,0.9) ${p * 360}deg, rgba(255,255,255,0.08) 0)`;
+    } else {
+      cooldownRing.style.opacity = "0";
+    }
+  } else {
+    cooldownRing.style.opacity = "0";
+    if (slot2) slot2.style.height = "0%";
+  }
+
+  if (toastTimer > 0) {
+    toastTimer -= dt;
+    if (toastTimer <= 0) toastEl.classList.remove("show");
+  }
+}
+
+function updateBolts(dt) {
+  for (let i = bolts.length - 1; i >= 0; i--) {
+    const b = bolts[i];
+    const sub = 3;
+    let hit = false;
+    for (let s = 0; s < sub; s++) {
+      b.mesh.position.addScaledVector(b.dir, ((b.speed || BOLT_SPEED) * dt) / sub);
+      if (hitScan(b, dt / sub)) {
+        hit = true;
+        break;
+      }
+    }
+    b.life -= dt;
+    b.mesh.rotation.z += dt * 10;
+    if (hit || b.life <= 0 || Math.abs(b.mesh.position.x) > WORLD_HALF + 2 || Math.abs(b.mesh.position.z) > WORLD_HALF + 2) {
+      if (!hit && b.life <= 0) burst(b.mesh.position.clone(), b.color || 0xe8c6ff, b.id === 2 ? 8 : 4, b.id === 2 ? 3 : 2, 0.25);
+      scene.remove(b.mesh);
+      bolts.splice(i, 1);
+    }
+  }
+}
+
+function updateCoins(dt) {
+  for (let i = coins3d.length - 1; i >= 0; i--) {
+    const c = coins3d[i];
+    if (!c.alive) {
+      coins3d.splice(i, 1);
+      continue;
+    }
+    c.t += dt;
+    c.mesh.rotation.z += dt * 3.2;
+    c.mesh.position.y = c.y + Math.sin(c.t * 3) * 0.12;
+    const dx = c.mesh.position.x - camera.position.x;
+    const dz = c.mesh.position.z - camera.position.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 2.2 && state === "playing") {
+      // slight magnet
+      c.mesh.position.x -= dx * dt * 3;
+      c.mesh.position.z -= dz * dt * 3;
+    }
+    if (dist < 1.15 && state === "playing") {
+      collectCoin(c);
+      coins3d.splice(i, 1);
+    }
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    p.vel.y -= p.grav * dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    p.mesh.rotation.x += dt * 6;
+    p.mesh.rotation.y += dt * 4;
+    const mat = p.mesh.material;
+    mat.opacity = Math.max(0, p.life / p.max);
+    if (p.life <= 0 || p.mesh.position.y < -0.2) {
+      scene.remove(p.mesh);
+      mat.dispose();
+      particles.splice(i, 1);
+    }
+  }
+}
+
+function updateCrates() {
+  for (const crate of crates) {
+    if (!crate.alive && crate.respawnAt && time >= crate.respawnAt) {
+      // only if player isn't standing on it
+      if (Math.hypot(camera.position.x - crate.x, camera.position.z - crate.z) > 2) {
+        scene.add(crate.mesh);
+        crate.alive = true;
+        crate.respawnAt = 0;
+        if (!colliders.includes(crate.col)) colliders.push(crate.col);
+      } else {
+        crate.respawnAt = time + 2;
+      }
+    }
+  }
+}
+
+function pickWander(d) {
+  for (let i = 0; i < 8; i++) {
+    const ang = randRange(0, Math.PI * 2);
+    const dist = randRange(4, 12);
+    const x = d.root.position.x + Math.cos(ang) * dist;
+    const z = d.root.position.z + Math.sin(ang) * dist;
+    if (Math.abs(x) < WORLD_HALF - 3 && Math.abs(z) < WORLD_HALF - 3 && !isSolidAt(x, z, 0.5)) {
+      d.target.set(x, 0, z);
+      return;
+    }
+  }
+  d.target.set(d.root.position.x, 0, d.root.position.z);
+}
+
+function updateDinos(dt) {
+  if (state === "dead" || state === "victory") return;
+  const px = camera.position.x;
+  const pz = camera.position.z;
+  const playing = state === "playing";
+
+  for (const d of dinos) {
+    if (!d.alive) continue;
+    if (time > d.flashUntil) {
+      tintMob(d, shopSafe);
+    }
+    if (d.biteCooldown > 0) d.biteCooldown -= dt;
+
+    // validate current locked target; fall back to player if turret died
+    if (d.targetKind === "turret" && (!d.targetTurret || !d.targetTurret.alive)) {
+      d.targetKind = "player";
+      d.targetTurret = null;
+      if (d.mode === "charge" || d.mode === "telegraph") d.mode = "recover";
+    }
+
+    const curTarget = resolveDinoTarget(d);
+    const dx = curTarget.dx;
+    const dz = curTarget.dz;
+    const dist = curTarget.dist;
+    const staggered = playing && time < d.staggerUntil;
+
+    if (playing && !shopSafe && (Math.abs(d.kbX) > 0.04 || Math.abs(d.kbZ) > 0.04)) {
+      let nx = d.root.position.x + d.kbX * dt;
+      let nz = d.root.position.z + d.kbZ * dt;
+      if (isSolidAt(nx, nz, 0.45 * d.scale, true)) {
+        if (!isSolidAt(nx, d.root.position.z, 0.45 * d.scale, true)) nz = d.root.position.z;
+        else if (!isSolidAt(d.root.position.x, nz, 0.45 * d.scale, true)) nx = d.root.position.x;
+        else { nx = d.root.position.x; nz = d.root.position.z; d.kbX = 0; d.kbZ = 0; }
+      }
+      d.root.position.x = Math.max(-WORLD_HALF + 1, Math.min(WORLD_HALF - 1, nx));
+      d.root.position.z = Math.max(-WORLD_HALF + 1, Math.min(WORLD_HALF - 1, nz));
+      d.kbX *= Math.max(0, 1 - 8 * dt);
+      d.kbZ *= Math.max(0, 1 - 8 * dt);
+    }
+
+    if (playing && !staggered && !shopSafe) {
+      if (d.mode === "wander") {
+        const seen = pickBestTarget(d, true);
+        if (seen) {
+          startSpot(d, seen);
+        } else {
+          d.wanderT -= dt;
+          if (d.wanderT <= 0 || Math.hypot(d.target.x - d.root.position.x, d.target.z - d.root.position.z) < 0.6) {
+            pickWander(d);
+            d.wanderT = randRange(2.5, 5.5);
+          }
+          steerDino(d, d.target.x, d.target.z, DINO_WALK, dt, "lerp", 6);
+        }
+      } else if (d.mode === "hunt") {
+        const seen = pickBestTarget(d, true);
+        const nearest = pickBestTarget(d, false);
+        if (nearest) {
+          d.targetKind = nearest.kind;
+          d.targetTurret = nearest.turret;
+        }
+        if (d.packDelay > 0) {
+          d.packDelay -= dt;
+          if (d.packDelay <= 0 && (seen || (nearest && nearest.dist < 14))) {
+            startSpot(d, seen || nearest);
+          }
+        } else if (seen || (nearest && nearest.dist < DINO_CLOSE_NOTICE + (d.isBoss ? 2 : 0))) {
+          startSpot(d, seen || nearest);
+        }
+        if (d.mode === "hunt") {
+          const tgt = resolveDinoTarget(d);
+          steerDino(d, tgt.x, tgt.z, DINO_HUNT, dt, "lerp", 5);
+        }
+      } else if (d.mode === "telegraph") {
+        const desired = Math.atan2(dx, dz);
+        d.heading += angleDiff(desired, d.heading) * Math.min(1, dt * 10);
+        d.root.rotation.y = d.heading;
+        d.telegraphT -= dt;
+        if (d.telegraphT <= 0) {
+          d.mode = "charge";
+          d.chargeT = DINO_CHARGE_TIME;
+          d.passedClose = false;
+          const baseSpd = d.isBoss ? DINO_CHARGE_SPEED * 0.86 : DINO_CHARGE_SPEED;
+          d.chargeSpeed = baseSpd * (0.96 + Math.random() * 0.1);
+        }
+      } else if (d.mode === "charge") {
+        d.chargeT -= dt;
+        steerDino(d, curTarget.x, curTarget.z, d.chargeSpeed || DINO_CHARGE_SPEED, dt, "max", d.isBoss ? DINO_CHARGE_TURN * 0.85 : DINO_CHARGE_TURN);
+        const closeMark = d.isBoss ? 4.0 : 2.8;
+        if (dist < closeMark) d.passedClose = true;
+        const fwdDot = dist > 0.001
+          ? (dx * Math.sin(d.heading) + dz * Math.cos(d.heading)) / dist
+          : 1;
+        const overshot = d.passedClose && fwdDot < 0.12 && dist > (d.isBoss ? 2.8 : 2.0);
+        if (overshot || d.chargeT <= 0) {
+          d.mode = "recover";
+          d.cooldownT = DINO_COOLDOWN;
+          if (d.alertMark) d.alertMark.visible = false;
+        }
+      } else if (d.mode === "recover") {
+        d.cooldownT -= dt;
+        const nearest = pickBestTarget(d, false);
+        if (nearest) {
+          d.targetKind = nearest.kind;
+          d.targetTurret = nearest.turret;
+        }
+        const tgt = resolveDinoTarget(d);
+        steerDino(d, tgt.x, tgt.z, DINO_WALK * 0.85, dt, "lerp", 4.2);
+        if (d.cooldownT <= 0) {
+          const seen = pickBestTarget(d, true);
+          if (seen) startSpot(d, seen);
+          else if (tgt.dist < DINO_CLOSE_NOTICE + 2) startSpot(d, tgt);
+          else {
+            d.mode = "hunt";
+            d.packDelay = 0;
+          }
+        }
+      }
+    } else if (!playing && (d.mode === "wander" || !d.mode)) {
+      d.wanderT -= dt;
+      if (d.wanderT <= 0 || Math.hypot(d.target.x - d.root.position.x, d.target.z - d.root.position.z) < 0.6) {
+        pickWander(d);
+        d.wanderT = randRange(2.5, 5.5);
+      }
+      steerDino(d, d.target.x, d.target.z, DINO_WALK, dt, "lerp", 6);
+    }
+
+    const charging = d.mode === "charge";
+    const telegraphing = d.mode === "telegraph";
+    const hunting = d.mode === "hunt" || d.mode === "recover";
+    const prevPhase = Math.floor(d.anim / Math.PI);
+    d.anim += dt * (shopSafe ? 2.2 : charging ? 14 : telegraphing ? 3 : hunting ? 9 : 7);
+    const curPhase = Math.floor(d.anim / Math.PI);
+    if (d.isBoss && playing && !telegraphing && curPhase !== prevPhase) {
+      playBossStep(Math.hypot(px - d.root.position.x, pz - d.root.position.z));
+    }
+
+    const bob = staggered ? 0.02 : Math.abs(Math.sin(d.anim)) * (charging ? 0.1 : 0.06);
+
+    const hipY = d.hipY || 0.86;
+    if (telegraphing) {
+      const rear = 1 - Math.max(0, d.telegraphT) / 0.6;
+      d.body.position.y = hipY + 0.06;
+      d.body.rotation.x = -0.2 * rear;
+      if (d.neck) d.neck.rotation.x = -0.35 - 0.45 * rear;
+      d.head.rotation.x = -0.55 * rear + Math.sin(time * 18) * 0.05;
+      if (d.jaw) d.jaw.rotation.x = 0.85 * rear;
+      d.tail.rotation.y = Math.sin(time * 12) * 0.35;
+      d.tail.rotation.x = 0.2;
+      for (const leg of d.legs) {
+        leg.rotation.x = 0;
+        if (leg.userData.shin) leg.userData.shin.rotation.x = 0;
+      }
+      if (d.arms) {
+        for (const arm of d.arms) arm.rotation.x = -0.85 - 0.2 * rear;
+      }
+    } else if (charging) {
+      const lunge = Math.sin(d.anim) * 0.06;
+      d.body.position.y = hipY + bob;
+      d.body.rotation.x = 0.08 + lunge;
+      if (d.neck) d.neck.rotation.x = -0.2 + Math.sin(d.anim) * 0.08;
+      d.head.rotation.x = 0.2 + Math.sin(d.anim) * 0.1;
+      if (d.jaw) d.jaw.rotation.x = 0.28;
+      d.tail.rotation.y = Math.sin(d.anim * 0.9) * 0.22;
+      d.tail.rotation.x = -0.12;
+      const swing = Math.sin(d.anim) * 0.85;
+      d.legs[0].rotation.x = swing;
+      d.legs[1].rotation.x = -swing;
+      if (d.legs[0].userData.shin) d.legs[0].userData.shin.rotation.x = Math.max(0, -swing) * 0.6;
+      if (d.legs[1].userData.shin) d.legs[1].userData.shin.rotation.x = Math.max(0, swing) * 0.6;
+      if (d.arms) {
+        d.arms[0].rotation.x = -0.7 + swing * 0.25;
+        if (d.arms[1]) d.arms[1].rotation.x = -0.7 - swing * 0.25;
+      }
+    } else {
+      d.body.position.y = hipY + bob;
+      d.body.rotation.x = 0;
+      if (d.neck) d.neck.rotation.x = -0.35 + Math.sin(d.anim) * 0.06;
+      d.head.rotation.x = Math.sin(d.anim) * 0.08;
+      if (d.jaw) d.jaw.rotation.x = 0;
+      d.tail.rotation.y = Math.sin(d.anim * 0.8) * 0.32;
+      d.tail.rotation.x = Math.sin(d.anim) * 0.08;
+      const swing = Math.sin(d.anim) * (hunting ? 0.62 : 0.5);
+      d.legs[0].rotation.x = swing;
+      d.legs[1].rotation.x = -swing;
+      if (d.legs[0].userData.shin) d.legs[0].userData.shin.rotation.x = Math.max(0, -swing) * 0.5;
+      if (d.legs[1].userData.shin) d.legs[1].userData.shin.rotation.x = Math.max(0, swing) * 0.5;
+      if (d.arms) {
+        d.arms[0].rotation.x = -0.85 + swing * 0.15;
+        if (d.arms[1]) d.arms[1].rotation.x = -0.85 - swing * 0.15;
+      }
+    }
+
+    if (d.alertMark) {
+      const show = telegraphing || charging;
+      d.alertMark.visible = show;
+      if (show) {
+        const pulse = 0.7 + Math.sin(time * 12) * 0.08;
+        d.alertMark.scale.set(pulse, pulse * 1.25, pulse);
+        d.alertMark.position.y = 2.15 + Math.sin(time * 8) * 0.05;
+      }
+    }
+
+    if (d.glint && d.carriedCoins > 0) {
+      d.glint.visible = true;
+      d.glint.rotation.y += dt * 3.5;
+      d.glint.position.y = 0.95 + Math.sin(time * 4) * 0.04;
+    }
+
+    if (playing) {
+      const stealR = (d.isBoss ? 1.15 : 1.0) * d.scale;
+      for (const c of coins3d) {
+        if (!c.alive) continue;
+        if (Math.hypot(c.mesh.position.x - d.root.position.x, c.mesh.position.z - d.root.position.z) < stealR) {
+          dinoTakeCoin(d, c);
+          break;
+        }
+      }
+    }
+
+    if (playing && !isCombatFrozen()) {
+      const pDist = Math.hypot(px - d.root.position.x, pz - d.root.position.z);
+      const eatR = d.isBoss ? (charging ? 2.65 : 2.35) : ((charging ? 1.28 : DINO_EAT) * d.scale);
+      if (pDist < eatR) {
+        takeHit(d.isBoss ? "boss" : "dino", d);
+        continue;
+      }
+      if (d.biteCooldown <= 0) {
+        const tEatR = (d.isBoss ? 2.6 : 1.55 * d.scale);
+        for (const tr of turrets) {
+          if (!tr.alive) continue;
+          if (Math.hypot(tr.x - d.root.position.x, tr.z - d.root.position.z) < tEatR) {
+            damageTurret(tr, d.isBoss ? 2 : 1);
+            d.biteCooldown = 0.65;
+            if (!tr.alive) {
+              d.targetKind = "player";
+              d.targetTurret = null;
+              d.mode = "recover";
+              d.cooldownT = 0.6;
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (playing && !shopSafe) {
+    dinoSpawnTimer -= dt;
+    const cap = bossSpawned ? MAX_DINOS_BOSS : MAX_DINOS;
+    const live = dinos.filter((d) => d.alive && !d.isBoss).length;
+    if (dinoSpawnTimer <= 0) {
+      if (live < cap) spawnDino(true);
+      if (bossSpawned) {
+        dinoSpawnTimer = difficulty === "easy" ? randRange(24, 32) : randRange(20, 28);
+      } else if (difficulty === "easy") {
+        dinoSpawnTimer = live <= 2 ? randRange(11, 16) : randRange(18, 26);
+      } else {
+        dinoSpawnTimer = live <= 2 ? randRange(8, 12) : randRange(14, 20);
+      }
+    }
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  time += dt;
+  if (state === "playing") runTime += dt;
+  if (victoryAt && time >= victoryAt && state === "playing") scoopCoinsAndVictory();
+  updateShopSafety();
+  updatePlayer(dt);
+  updateWand(dt);
+  updateBolts(dt);
+  updateCoins(dt);
+  updateParticles(dt);
+  updateCrates();
+  updateShrines(dt);
+  updateTurrets(dt);
+  updateShopkeeper(dt);
+  updateDinos(dt);
+  updatePteras(dt);
+  renderer.render(scene, camera);
+}
+
+hud.style.visibility = "hidden";
+updateHeartsHUD();
+loadDifficulty();
+bindDifficultyButtons();
+refreshDifficultyUI();
+refreshWandBar();
+window.__dinoWand = {
+  get state() { return state; },
+  dinos,
+  pteras,
+  crates,
+  turrets,
+  bolts,
+  camera,
+  shrines,
+  get shopkeeper() { return shopkeeper; },
+  get healer() { return healer; },
+  get hearts() { return hearts; },
+  get maxHearts() { return maxHearts; },
+  get dinosDefeated() { return dinosDefeated; },
+  tryBuyHeart,
+  tryBuyNearby,
+  takeHit,
+  updateHeartsHUD,
+  inShopZone,
+  isCombatFrozen,
+  get shopSafe() { return shopSafe; },
+  get shopLeaveGraceUntil() { return shopLeaveGraceUntil; },
+  aggroDino,
+  aggroPtera,
+  hurtDino,
+  WAND_DEFS,
+  startSpot,
+  spawnDino,
+  triggerBoss,
+  killDino,
+  dropDinoLoot,
+  findCoinSpot,
+  coins3d,
+  placeTurretAt,
+  trySelectWand,
+  shootWand,
+  onDeath,
+  spawnPtera,
+  killPtera,
+  hurtPtera,
+  spawnBolt,
+  resetGame,
+  maybeUnlockPteras,
+  pteraCap,
+  get pteraSpawnTimer() { return pteraSpawnTimer; },
+  setKills(n) { dinosDefeated = n; updateDinoCounter(); maybeUnlockPteras(); },
+  addTurrets(n) { turretStock += n; refreshWandBar(); },
+  setPlaying() {
+    state = "playing";
+    hide(overlayStart);
+    hide(overlayDeath);
+    hide(overlayVictory);
+    hud.style.visibility = "visible";
+  },
+  setLook(y, p) { yaw = y; pitch = p; },
+  setCoins(n) { coins = n; coinEl.textContent = String(n); },
+  setHearts(cur, max) {
+    maxHearts = Math.max(1, Math.min(HEART_MAX, max != null ? max : cur));
+    hearts = Math.max(0, Math.min(maxHearts, cur));
+    updateHeartsHUD();
+  },
+  get difficulty() { return difficulty; },
+  setDifficulty,
+  isSolidAt,
+  dinoTakeCoin,
+};
+animate();
+  </script>
+</body>
+</html>
