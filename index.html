@@ -495,7 +495,7 @@
       letter-spacing: 0.06em;
       font-size: 13px;
     }
-    #touch-ui button:active, #touch-ui button.held, #touch-run.on {
+    #touch-ui button:active, #touch-ui button.held {
       background: rgba(255, 210, 74, 0.45);
       color: #2a1c08;
     }
@@ -610,7 +610,6 @@
   <div id="touch-ui" class="hidden" aria-hidden="true">
     <div id="rotate-hint" class="hidden">Rotate your device — landscape plays best</div>
     <div id="touch-left">
-      <button type="button" id="touch-run" aria-label="Run">Run</button>
       <div id="touch-dpad" aria-label="Move">
         <div class="dpad-ring"></div>
         <div class="dpad-cross"></div>
@@ -636,7 +635,7 @@
         <li><span>1 / 2 / 3</span> Switch wands</li>
         <li><span>4</span> Select turret (click to place)</li>
         <li class="desktop-help"><span>E</span> Buy from shrines or shops</li>
-        <li class="touch-help"><span>Pad</span> Move · drag off or around to look</li>
+        <li class="touch-help"><span>Pad</span> Move (always runs) · drag off or around to look</li>
         <li class="touch-help"><span>Fire</span> Shoot, or auto-fires on a target</li>
       </ul>
       <p style="margin-bottom:16px">Break crates for coins, visit shrines, the turret shop, and the healer for extra hearts. Defeat 25 dinos to summon the Tyrant!</p>
@@ -820,9 +819,6 @@ let shopLeaveGraceUntil = 0;
 let bossPending = false;
 let touchMode = false;
 const touchStick = { x: 0, y: 0 };
-let touchRun = false;
-let touchRunHeld = false;
-let touchRunSticky = false;
 let fireHeld = false;
 const touchPointers = new Map();
 
@@ -4372,7 +4368,6 @@ window.addEventListener("orientationchange", () => {
 const touchUi = $("touch-ui");
 const touchDpad = $("touch-dpad");
 const dpadNub = $("dpad-nub");
-const touchRunBtn = $("touch-run");
 const touchFireBtn = $("touch-fire");
 const touchBuyBtn = $("touch-buy");
 const touchPauseBtn = $("touch-pause");
@@ -4413,9 +4408,6 @@ function clearTouchPointers() {
   touchStick.x = 0;
   touchStick.y = 0;
   fireHeld = false;
-  touchRunHeld = false;
-  touchRun = touchRunSticky;
-  if (touchRunBtn) touchRunBtn.classList.toggle("on", !!touchRun);
   if (touchFireBtn) touchFireBtn.classList.remove("held");
   updateDpadNub(0, 0);
 }
@@ -4449,7 +4441,6 @@ function applyStickFromPoint(clientX, clientY) {
 function isUiControl(target) {
   if (!target || !target.closest) return false;
   return !!(
-    target.closest("#touch-run") ||
     target.closest("#touch-fire") ||
     target.closest("#touch-buy") ||
     target.closest("#touch-pause") ||
@@ -4629,34 +4620,6 @@ document.addEventListener("contextmenu", (e) => {
   if (touchMode) e.preventDefault();
 });
 
-if (touchRunBtn) {
-  let runDownAt = 0;
-  touchRunBtn.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    runDownAt = performance.now();
-    touchRunHeld = true;
-    touchRun = true;
-    touchRunBtn.classList.add("held", "on");
-    if (touchRunBtn.setPointerCapture) touchRunBtn.setPointerCapture(e.pointerId);
-  });
-  const endRun = (e) => {
-    if (e) e.preventDefault();
-    const held = performance.now() - runDownAt;
-    touchRunHeld = false;
-    if (held < 220) {
-      touchRunSticky = !touchRunSticky;
-    } else {
-      touchRunSticky = false;
-    }
-    touchRun = touchRunSticky;
-    touchRunBtn.classList.remove("held");
-    touchRunBtn.classList.toggle("on", !!touchRun);
-  };
-  touchRunBtn.addEventListener("pointerup", endRun);
-  touchRunBtn.addEventListener("pointercancel", endRun);
-}
-
 if (touchFireBtn) {
   touchFireBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -4741,7 +4704,7 @@ function updatePlayer(dt) {
   const analog = Math.min(1, Math.hypot(touchStick.x, touchStick.y));
   const moving = tmpMove.lengthSq() > 0;
   if (moving) tmpMove.normalize();
-  const running = !!((keys.Shift || touchRun) && moving);
+  const running = !!((keys.Shift || touchMode) && moving);
   const keyMove = !!(keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD);
   const speed = (running ? RUN_SPEED : WALK_SPEED) * (keyMove || !analog ? 1 : analog);
   let vx = moving ? tmpMove.x * speed : 0;
@@ -5232,7 +5195,7 @@ window.__dinoWand = {
   enableTouchMode,
   get touchMode() { return touchMode; },
   get touchStick() { return touchStick; },
-  get touchRun() { return touchRun; },
+  get touchRun() { return touchMode; },
   hostileUnderCrosshair,
   inShopZone,
   isCombatFrozen,
