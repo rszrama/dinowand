@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Dino Wand</title>
+  <meta name="description" content="A low-poly first-person browser game: explore a village, shoot your wand, collect coins, and take down dinosaurs — including flying pterodactyls and the Ancient Tyrant." />
+  <meta property="og:title" content="Dino Wand" />
+  <meta property="og:description" content="A low-poly first-person browser game: explore a village, shoot your wand, collect coins, and take down dinosaurs — including flying pterodactyls and the Ancient Tyrant." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://rszrama.github.io/dinowand/" />
+  <meta property="og:image" content="https://rszrama.github.io/dinowand/screenshot.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Dino Wand" />
+  <meta name="twitter:description" content="A low-poly first-person browser game: explore a village, shoot your wand, collect coins, and take down dinosaurs — including flying pterodactyls and the Ancient Tyrant." />
+  <meta name="twitter:image" content="https://rszrama.github.io/dinowand/screenshot.png" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%232d4a2c'/%3E%3Ccircle cx='8' cy='8' r='5' fill='%23ffd24a'/%3E%3C/svg%3E" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,8 +25,12 @@
       font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       color: #f4f0e4;
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none;
+      overscroll-behavior: none;
     }
-    canvas { display: block; width: 100%; height: 100%; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     #hud {
       position: fixed;
       inset: 0;
@@ -393,6 +407,151 @@
       text-shadow: 0 3px 0 #5a420c;
       margin-bottom: 10px;
     }
+  
+    #touch-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 6;
+      pointer-events: none;
+    }
+    #touch-ui.hidden, #touch-buy.hidden { display: none; }
+    #rotate-hint {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #ffe58a;
+      background: rgba(8,14,10,0.62);
+      border: 1px solid rgba(255,229,138,0.35);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    #rotate-hint.hidden { display: none; }
+    #touch-left, #touch-right {
+      position: absolute;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+    #touch-left { left: max(10px, env(safe-area-inset-left)); align-items: flex-start; }
+    #touch-right { right: max(10px, env(safe-area-inset-right)); align-items: flex-end; }
+    #touch-dpad {
+      position: relative;
+      width: min(42vw, 28vh, 168px);
+      height: min(42vw, 28vh, 168px);
+      pointer-events: auto;
+      touch-action: none;
+      flex: 0 0 auto;
+    }
+    #touch-dpad .dpad-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: rgba(10, 16, 12, 0.38);
+      border: 2px solid rgba(255, 229, 138, 0.38);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+    }
+    #touch-dpad .dpad-cross {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 46%; height: 46%;
+      transform: translate(-50%, -50%);
+      background:
+        linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18)) center/18% 100% no-repeat,
+        linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18)) center/100% 18% no-repeat;
+      opacity: 0.85;
+      pointer-events: none;
+    }
+    #dpad-nub {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 38%; height: 38%;
+      border-radius: 50%;
+      background: rgba(255, 210, 74, 0.55);
+      border: 2px solid rgba(255, 229, 138, 0.7);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    #touch-ui button {
+      pointer-events: auto;
+      touch-action: none;
+      min-width: 52px;
+      min-height: 44px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 2px solid rgba(255,229,138,0.4);
+      background: rgba(10, 16, 12, 0.45);
+      color: #f4f0e4;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 13px;
+    }
+    #touch-ui button:active, #touch-ui button.held, #touch-run.on {
+      background: rgba(255, 210, 74, 0.45);
+      color: #2a1c08;
+    }
+    #touch-fire {
+      width: min(26vw, 20vh, 118px);
+      height: min(26vw, 20vh, 118px);
+      min-width: 76px;
+      min-height: 76px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: 700;
+      background: rgba(180, 40, 30, 0.42);
+      border-color: rgba(255, 160, 140, 0.55);
+    }
+    #touch-fire.place {
+      background: rgba(40, 140, 90, 0.48);
+      border-color: rgba(125, 255, 176, 0.55);
+    }
+    #touch-fire:active, #touch-fire.held {
+      background: rgba(220, 60, 40, 0.7);
+      color: #fff;
+    }
+    #touch-pause { font-size: 12px; padding: 8px 14px; }
+    body.touch-mode #wand-bar {
+      pointer-events: auto;
+      bottom: max(8px, env(safe-area-inset-bottom));
+      gap: 5px;
+      z-index: 7;
+    }
+    body.touch-mode .wand-slot {
+      pointer-events: auto;
+      touch-action: none;
+      width: 68px;
+      padding: 6px 4px 5px;
+    }
+    body.touch-mode #hint { display: none; }
+    body.touch-mode #interact-prompt { display: none; }
+    body.touch-aim #crosshair::before, body.touch-aim #crosshair::after {
+      background: #ff9a5c;
+    }
+    body.touch-mode .overlay, body.touch-mode .panel, body.touch-mode button {
+      touch-action: manipulation;
+    }
+    body.touch-mode .mode-btn, body.touch-mode .panel button {
+      min-height: 44px;
+      pointer-events: auto;
+    }
+    .touch-help { display: none; }
+    body.touch-mode .touch-help { display: list-item; }
+    body.touch-mode .desktop-help { display: none; }
+    @media (orientation: portrait) {
+      body.touch-mode #touch-dpad {
+        width: min(38vw, 22vh, 150px);
+        height: min(38vw, 22vh, 150px);
+      }
+    }
   </style>
   <script type="importmap">
   {
@@ -448,6 +607,23 @@
     <div id="hint">WASD move · Shift run · 1–3 wands · 4 turret · E buy · Click shoot/place</div>
   </div>
 
+  <div id="touch-ui" class="hidden" aria-hidden="true">
+    <div id="rotate-hint" class="hidden">Rotate your device — landscape plays best</div>
+    <div id="touch-left">
+      <button type="button" id="touch-run" aria-label="Run">Run</button>
+      <div id="touch-dpad" aria-label="Move">
+        <div class="dpad-ring"></div>
+        <div class="dpad-cross"></div>
+        <div id="dpad-nub"></div>
+      </div>
+    </div>
+    <div id="touch-right">
+      <button type="button" id="touch-pause" aria-label="Pause">Pause</button>
+      <button type="button" id="touch-buy" class="hidden" aria-label="Buy">Buy</button>
+      <button type="button" id="touch-fire" aria-label="Fire">Fire</button>
+    </div>
+  </div>
+
   <div id="overlay-start" class="overlay">
     <div class="panel">
       <h1>DINO WAND</h1>
@@ -459,7 +635,9 @@
         <li><span>Click</span> Shoot your wand</li>
         <li><span>1 / 2 / 3</span> Switch wands</li>
         <li><span>4</span> Select turret (click to place)</li>
-        <li><span>E</span> Buy from shrines or shops</li>
+        <li class="desktop-help"><span>E</span> Buy from shrines or shops</li>
+        <li class="touch-help"><span>Pad</span> Move · drag off or around to look</li>
+        <li class="touch-help"><span>Fire</span> Shoot, or auto-fires on a target</li>
       </ul>
       <p style="margin-bottom:16px">Break crates for coins, visit shrines, the turret shop, and the healer for extra hearts. Defeat 25 dinos to summon the Tyrant!</p>
       <div class="mode-row">
@@ -640,6 +818,13 @@ let pteraSpawnTimer = 6;
 let shopSafe = false;
 let shopLeaveGraceUntil = 0;
 let bossPending = false;
+let touchMode = false;
+const touchStick = { x: 0, y: 0 };
+let touchRun = false;
+let touchRunHeld = false;
+let touchRunSticky = false;
+let fireHeld = false;
+const touchPointers = new Map();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY);
@@ -650,8 +835,12 @@ camera.rotation.order = "YXZ";
 camera.position.set(0, PLAYER_EYE, 8);
 scene.add(camera);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+function applyRendererQuality() {
+  const cap = touchMode ? 1.5 : 2;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, cap));
+}
+applyRendererQuality();
 renderer.setSize(innerWidth, innerHeight);
 renderer.setClearColor(SKY);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -3752,8 +3941,26 @@ function startPlay(lock = true) {
   hide(overlayDeath);
   hide(overlayVictory);
   hud.style.visibility = "visible";
+  if (touchUi) {
+    touchUi.classList.toggle("hidden", !touchMode);
+    touchUi.setAttribute("aria-hidden", touchMode ? "false" : "true");
+  }
   shootLockUntil = performance.now() + 250;
-  if (lock) requestLock();
+  fireHeld = false;
+  if (lock && !touchMode) requestLock();
+  updateRotateHint();
+}
+
+function pauseGame() {
+  if (state !== "playing") return;
+  state = "paused";
+  fireHeld = false;
+  clearTouchPointers();
+  overlayStart.querySelector("h1").textContent = "PAUSED";
+  overlayStart.querySelector(".tag").textContent = touchMode ? "Tap Play to keep exploring" : "Click to keep exploring";
+  btnStart.textContent = "Resume";
+  show(overlayStart);
+  if (document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
 }
 
 function requestLock() {
@@ -4090,7 +4297,7 @@ function resetGame() {
   clearPteras();
   for (let i = 0; i < 4; i++) spawnDino(false);
 
-  startPlay(true);
+  startPlay(!touchMode);
 }
 
 // initial dinos
@@ -4134,33 +4341,378 @@ renderer.domElement.addEventListener("mousedown", (e) => {
   }
 });
 
-btnStart.addEventListener("click", () => startPlay(true));
+btnStart.addEventListener("click", () => startPlay(!touchMode));
 btnAgain.addEventListener("click", () => resetGame());
 btnWinAgain.addEventListener("click", () => resetGame());
 
 document.addEventListener("pointerlockchange", () => {
+  if (touchMode) return;
   if (document.pointerLockElement === renderer.domElement) return;
-  if (state === "playing") {
-    state = "paused";
-    // reuse start overlay as pause
-    overlayStart.querySelector("h1").textContent = "PAUSED";
-    overlayStart.querySelector(".tag").textContent = "Click to keep exploring";
-    btnStart.textContent = "Resume";
-    show(overlayStart);
-  }
+  if (state === "playing") pauseGame();
 });
 
 window.addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  applyRendererQuality();
   renderer.setSize(innerWidth, innerHeight);
+  updateRotateHint();
 });
+window.addEventListener("orientationchange", () => {
+  setTimeout(() => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    applyRendererQuality();
+    renderer.setSize(innerWidth, innerHeight);
+    updateRotateHint();
+  }, 80);
+});
+
+// --- touch / mobile controls ---
+const touchUi = $("touch-ui");
+const touchDpad = $("touch-dpad");
+const dpadNub = $("dpad-nub");
+const touchRunBtn = $("touch-run");
+const touchFireBtn = $("touch-fire");
+const touchBuyBtn = $("touch-buy");
+const touchPauseBtn = $("touch-pause");
+const rotateHintEl = $("rotate-hint");
+const LOOK_SENS = 0.0036;
+const DPAD_DEAD = 0.18;
+const DPAD_LEAVE = 1.28;
+
+function updateRotateHint() {
+  if (!rotateHintEl) return;
+  const show = touchMode && innerHeight > innerWidth + 24;
+  rotateHintEl.classList.toggle("hidden", !show);
+}
+
+function enableTouchMode() {
+  if (touchMode) return;
+  touchMode = true;
+  document.body.classList.add("touch-mode");
+  if (touchUi) {
+    touchUi.classList.toggle("hidden", state !== "playing");
+    touchUi.setAttribute("aria-hidden", state === "playing" ? "false" : "true");
+  }
+  if (state === "start" && btnStart && !overlayStart.classList.contains("hidden")) {
+    btnStart.textContent = "Play";
+  }
+  applyRendererQuality();
+  renderer.setSize(innerWidth, innerHeight);
+  updateRotateHint();
+}
+
+if (window.matchMedia && matchMedia("(pointer: coarse)").matches) {
+  enableTouchMode();
+}
+window.addEventListener("touchstart", () => enableTouchMode(), { passive: true, once: false });
+
+function clearTouchPointers() {
+  touchPointers.clear();
+  touchStick.x = 0;
+  touchStick.y = 0;
+  fireHeld = false;
+  touchRunHeld = false;
+  touchRun = touchRunSticky;
+  if (touchRunBtn) touchRunBtn.classList.toggle("on", !!touchRun);
+  if (touchFireBtn) touchFireBtn.classList.remove("held");
+  updateDpadNub(0, 0);
+}
+
+function updateDpadNub(x, y) {
+  if (!dpadNub) return;
+  const max = 28;
+  dpadNub.style.transform = "translate(calc(-50% + " + (x * max) + "px), calc(-50% + " + (-y * max) + "px))";
+}
+
+function dpadCenter() {
+  const r = touchDpad.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2, rad: Math.min(r.width, r.height) / 2 };
+}
+
+function applyStickFromPoint(clientX, clientY) {
+  const c = dpadCenter();
+  let dx = (clientX - c.x) / c.rad;
+  let dy = (c.y - clientY) / c.rad; // up is forward (+)
+  const mag = Math.hypot(dx, dy);
+  if (mag < DPAD_DEAD) { touchStick.x = 0; touchStick.y = 0; updateDpadNub(0, 0); return mag; }
+  const n = Math.min(1, mag);
+  dx = (dx / mag) * n;
+  dy = (dy / mag) * n;
+  touchStick.x = dx;
+  touchStick.y = dy;
+  updateDpadNub(dx, dy);
+  return mag;
+}
+
+function isUiControl(target) {
+  if (!target || !target.closest) return false;
+  return !!(
+    target.closest("#touch-run") ||
+    target.closest("#touch-fire") ||
+    target.closest("#touch-buy") ||
+    target.closest("#touch-pause") ||
+    target.closest(".wand-slot") ||
+    target.closest(".overlay") ||
+    target.closest(".mode-btn") ||
+    target.closest("button")
+  );
+}
+
+function applyLookDelta(dx, dy) {
+  yaw -= dx * LOOK_SENS;
+  pitch -= dy * LOOK_SENS;
+  const lim = Math.PI / 2 - 0.08;
+  if (pitch > lim) pitch = lim;
+  if (pitch < -lim) pitch = -lim;
+}
+
+function raySphereT(origin, dir, cx, cy, cz, r) {
+  const ox = origin.x - cx, oy = origin.y - cy, oz = origin.z - cz;
+  const b = ox * dir.x + oy * dir.y + oz * dir.z;
+  const c = ox * ox + oy * oy + oz * oz - r * r;
+  const disc = b * b - c;
+  if (disc < 0) return null;
+  const t = -b - Math.sqrt(disc);
+  if (t < 0) {
+    const t2 = -b + Math.sqrt(disc);
+    return t2 > 0 ? t2 : null;
+  }
+  return t;
+}
+
+function rayBlocked(origin, dir, dist) {
+  const steps = Math.max(4, Math.ceil(dist / 1.15));
+  for (let i = 1; i <= steps; i++) {
+    const t = (i / steps) * dist;
+    const x = origin.x + dir.x * t;
+    const y = origin.y + dir.y * t;
+    const z = origin.z + dir.z * t;
+    if (y > 4.5) continue;
+    for (const col of colliders) {
+      if (col.kind === "crate" || col.kind === "turret" || col.kind === "npc") continue;
+      if (Math.abs(x - col.x) < col.hx + 0.1 && Math.abs(z - col.z) < col.hz + 0.1) return true;
+    }
+  }
+  return false;
+}
+
+function hostileUnderCrosshair() {
+  if (state !== "playing" || activeWand === 4) return false;
+  const def = WAND_DEFS[activeWand - 1];
+  if (!def || !def.unlocked) return false;
+  const range = (def.speed || BOLT_SPEED) * (def.life || BOLT_LIFE);
+  const origin = camera.position;
+  const dir = tmpAim;
+  camera.getWorldDirection(dir);
+  let bestT = range;
+  let hit = false;
+  for (const d of dinos) {
+    if (!d.alive) continue;
+    const cy = (d.aimY != null ? d.aimY : 1.05 * d.scale);
+    const rad = (d.isBoss ? 0.9 : 0.62) * d.scale + 0.2;
+    const t = raySphereT(origin, dir, d.root.position.x, cy, d.root.position.z, rad);
+    if (t != null && t > 0.15 && t < bestT && !rayBlocked(origin, dir, t)) {
+      bestT = t;
+      hit = true;
+    }
+  }
+  for (const pt of pteras) {
+    if (!pt.alive || pt.falling) continue;
+    const t = raySphereT(origin, dir, pt.root.position.x, pt.root.position.y, pt.root.position.z, PTERA_HIT_R + 0.2);
+    if (t != null && t > 0.15 && t < bestT && !rayBlocked(origin, dir, t)) {
+      bestT = t;
+      hit = true;
+    }
+  }
+  return hit;
+}
+
+function updateAutoFire() {
+  if (!touchMode || state !== "playing") return;
+  if (activeWand === 4) return;
+  if (fireHeld || hostileUnderCrosshair()) shootWand();
+}
+
+function updateTouchChrome() {
+  if (!touchMode) {
+    if (document.body) document.body.classList.remove("touch-aim");
+    return;
+  }
+  if (touchBuyBtn) {
+    const show = state === "playing" && inShopZone();
+    touchBuyBtn.classList.toggle("hidden", !show);
+  }
+  if (touchFireBtn) {
+    const place = activeWand === 4;
+    touchFireBtn.textContent = place ? "Place" : "Fire";
+    touchFireBtn.classList.toggle("place", place);
+  }
+  if (touchUi) {
+    const vis = state === "playing";
+    touchUi.classList.toggle("hidden", !vis);
+    touchUi.setAttribute("aria-hidden", vis ? "false" : "true");
+  }
+  document.body.classList.toggle("touch-aim", state === "playing" && activeWand !== 4 && hostileUnderCrosshair());
+}
+
+function refreshMoveFromPointers() {
+  let moving = false;
+  for (const rec of touchPointers.values()) {
+    if (rec.role === "move") {
+      applyStickFromPoint(rec.x, rec.y);
+      moving = true;
+      break;
+    }
+  }
+  if (!moving) {
+    touchStick.x = 0;
+    touchStick.y = 0;
+    updateDpadNub(0, 0);
+  }
+}
+
+function onTouchPointerDown(e) {
+  if (e.pointerType && e.pointerType !== "touch" && e.pointerType !== "pen") return;
+  enableTouchMode();
+  if (state !== "playing") return;
+  if (isUiControl(e.target)) return;
+  const onDpad = !!(e.target && e.target.closest && e.target.closest("#touch-dpad"));
+  const rec = { role: onDpad ? "move" : "look", x: e.clientX, y: e.clientY };
+  touchPointers.set(e.pointerId, rec);
+  if (onDpad) {
+    applyStickFromPoint(e.clientX, e.clientY);
+    if (touchDpad && touchDpad.setPointerCapture) {
+      try { touchDpad.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    }
+  }
+}
+
+function onTouchPointerMove(e) {
+  const rec = touchPointers.get(e.pointerId);
+  if (!rec) return;
+  const dx = e.clientX - rec.x;
+  const dy = e.clientY - rec.y;
+  rec.x = e.clientX;
+  rec.y = e.clientY;
+  if (rec.role === "move") {
+    const mag = applyStickFromPoint(e.clientX, e.clientY);
+    const c = dpadCenter();
+    if (mag > DPAD_LEAVE || Math.hypot(e.clientX - c.x, e.clientY - c.y) > c.rad * DPAD_LEAVE) {
+      rec.role = "look";
+      touchStick.x = 0;
+      touchStick.y = 0;
+      updateDpadNub(0, 0);
+    }
+    return;
+  }
+  if (rec.role === "look") applyLookDelta(dx, dy);
+}
+
+function onTouchPointerUp(e) {
+  if (!touchPointers.has(e.pointerId)) return;
+  touchPointers.delete(e.pointerId);
+  refreshMoveFromPointers();
+}
+
+window.addEventListener("pointerdown", onTouchPointerDown, { capture: true });
+window.addEventListener("pointermove", onTouchPointerMove, { capture: true });
+window.addEventListener("pointerup", onTouchPointerUp, { capture: true });
+window.addEventListener("pointercancel", onTouchPointerUp, { capture: true });
+
+document.addEventListener("touchmove", (e) => {
+  if (touchMode) e.preventDefault();
+}, { passive: false });
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener("contextmenu", (e) => {
+  if (touchMode) e.preventDefault();
+});
+
+if (touchRunBtn) {
+  let runDownAt = 0;
+  touchRunBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    runDownAt = performance.now();
+    touchRunHeld = true;
+    touchRun = true;
+    touchRunBtn.classList.add("held", "on");
+    if (touchRunBtn.setPointerCapture) touchRunBtn.setPointerCapture(e.pointerId);
+  });
+  const endRun = (e) => {
+    if (e) e.preventDefault();
+    const held = performance.now() - runDownAt;
+    touchRunHeld = false;
+    if (held < 220) {
+      touchRunSticky = !touchRunSticky;
+    } else {
+      touchRunSticky = false;
+    }
+    touchRun = touchRunSticky;
+    touchRunBtn.classList.remove("held");
+    touchRunBtn.classList.toggle("on", !!touchRun);
+  };
+  touchRunBtn.addEventListener("pointerup", endRun);
+  touchRunBtn.addEventListener("pointercancel", endRun);
+}
+
+if (touchFireBtn) {
+  touchFireBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (state !== "playing") return;
+    touchFireBtn.classList.add("held");
+    if (activeWand === 4) {
+      tryPlaceTurret();
+      fireHeld = false;
+    } else {
+      fireHeld = true;
+      shootWand();
+    }
+    if (touchFireBtn.setPointerCapture) touchFireBtn.setPointerCapture(e.pointerId);
+  });
+  const endFire = () => {
+    fireHeld = false;
+    touchFireBtn.classList.remove("held");
+  };
+  touchFireBtn.addEventListener("pointerup", endFire);
+  touchFireBtn.addEventListener("pointercancel", endFire);
+}
+
+if (touchBuyBtn) {
+  touchBuyBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (state === "playing") tryBuyNearby();
+  });
+}
+
+if (touchPauseBtn) {
+  touchPauseBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    pauseGame();
+  });
+}
+
+for (const slot of document.querySelectorAll(".wand-slot")) {
+  slot.addEventListener("pointerdown", (e) => {
+    if (!touchMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    trySelectWand(Number(slot.dataset.slot));
+  });
+}
+
+window.addEventListener("blur", clearTouchPointers);
 
 // --- update ---
 const clock = new THREE.Clock();
 const tmpDir = new THREE.Vector3();
 const tmpRight = new THREE.Vector3();
 const tmpMove = new THREE.Vector3();
+const tmpAim = new THREE.Vector3();
 
 function updatePlayer(dt) {
   camera.rotation.y = yaw;
@@ -4183,11 +4735,15 @@ function updatePlayer(dt) {
   if (keys.KeyS) tmpMove.sub(tmpDir);
   if (keys.KeyA) tmpMove.sub(tmpRight);
   if (keys.KeyD) tmpMove.add(tmpRight);
+  if (touchStick.y) tmpMove.addScaledVector(tmpDir, touchStick.y);
+  if (touchStick.x) tmpMove.addScaledVector(tmpRight, touchStick.x);
 
+  const analog = Math.min(1, Math.hypot(touchStick.x, touchStick.y));
   const moving = tmpMove.lengthSq() > 0;
   if (moving) tmpMove.normalize();
-  const running = !!(keys.Shift && moving);
-  const speed = running ? RUN_SPEED : WALK_SPEED;
+  const running = !!((keys.Shift || touchRun) && moving);
+  const keyMove = !!(keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD);
+  const speed = (running ? RUN_SPEED : WALK_SPEED) * (keyMove || !analog ? 1 : analog);
   let vx = moving ? tmpMove.x * speed : 0;
   let vz = moving ? tmpMove.z * speed : 0;
   vx += playerKbX;
@@ -4634,6 +5190,8 @@ function animate() {
   if (victoryAt && time >= victoryAt && state === "playing") scoopCoinsAndVictory();
   updateShopSafety();
   updatePlayer(dt);
+  updateTouchChrome();
+  updateAutoFire();
   updateWand(dt);
   updateBolts(dt);
   updateCoins(dt);
@@ -4671,6 +5229,11 @@ window.__dinoWand = {
   tryBuyNearby,
   takeHit,
   updateHeartsHUD,
+  enableTouchMode,
+  get touchMode() { return touchMode; },
+  get touchStick() { return touchStick; },
+  get touchRun() { return touchRun; },
+  hostileUnderCrosshair,
   inShopZone,
   isCombatFrozen,
   get shopSafe() { return shopSafe; },
@@ -4706,6 +5269,7 @@ window.__dinoWand = {
     hide(overlayDeath);
     hide(overlayVictory);
     hud.style.visibility = "visible";
+    if (typeof updateTouchChrome === "function") updateTouchChrome();
   },
   setLook(y, p) { yaw = y; pitch = p; },
   setCoins(n) { coins = n; coinEl.textContent = String(n); },
