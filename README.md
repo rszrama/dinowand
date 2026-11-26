@@ -21,8 +21,8 @@ Choose **Easy** or **Hard** on the start, death, or victory screen. Shops (the t
 
 ### Mobile / touch
 
-- Left **D-pad** to move (diagonals supported); movement always uses run speed
-- Drag anywhere that isn’t a button — or drag off the D-pad — to look around
+- Left **joystick** to move (diagonals supported); movement always uses run speed. After you press it, that finger keeps steering even if you slide well off the pad — the stick follows so you can reverse quickly
+- Drag anywhere else that isn’t a button to look around
 - Auto-fires when a hostile is under the crosshair; hold **Fire** to shoot (or place a turret when that slot is active)
 - Tap wand / turret slots **1–4**; a **Buy** button appears in shop zones; **Pause** to pause
 - Landscape is recommended (still playable in portrait)

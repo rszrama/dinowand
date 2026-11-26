@@ -443,13 +443,25 @@
     }
     #touch-left { left: max(10px, env(safe-area-inset-left)); align-items: flex-start; }
     #touch-right { right: max(10px, env(safe-area-inset-right)); align-items: flex-end; }
-    #touch-dpad {
+    #touch-move-zone {
       position: relative;
-      width: min(42vw, 28vh, 168px);
-      height: min(42vw, 28vh, 168px);
+      width: min(58vw, 82vh, 400px);
+      height: min(58vw, 82vh, 400px);
       pointer-events: auto;
       touch-action: none;
-      flex: 0 0 auto;
+    }
+    #touch-dpad {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: min(50vw, 50vh, 240px);
+      height: min(50vw, 50vh, 240px);
+      pointer-events: auto;
+      touch-action: none;
+      z-index: 1;
+    }
+    #touch-dpad.returning {
+      transition: transform 0.18s ease-out;
     }
     #touch-dpad .dpad-ring {
       position: absolute;
@@ -547,9 +559,13 @@
     body.touch-mode .touch-help { display: list-item; }
     body.touch-mode .desktop-help { display: none; }
     @media (orientation: portrait) {
+      body.touch-mode #touch-move-zone {
+        width: min(64vw, 42vh, 360px);
+        height: min(64vw, 42vh, 360px);
+      }
       body.touch-mode #touch-dpad {
-        width: min(38vw, 22vh, 150px);
-        height: min(38vw, 22vh, 150px);
+        width: min(56vw, 32vh, 230px);
+        height: min(56vw, 32vh, 230px);
       }
     }
   </style>
@@ -610,10 +626,12 @@
   <div id="touch-ui" class="hidden" aria-hidden="true">
     <div id="rotate-hint" class="hidden">Rotate your device — landscape plays best</div>
     <div id="touch-left">
-      <div id="touch-dpad" aria-label="Move">
-        <div class="dpad-ring"></div>
-        <div class="dpad-cross"></div>
-        <div id="dpad-nub"></div>
+      <div id="touch-move-zone">
+        <div id="touch-dpad" aria-label="Move">
+          <div class="dpad-ring"></div>
+          <div class="dpad-cross"></div>
+          <div id="dpad-nub"></div>
+        </div>
       </div>
     </div>
     <div id="touch-right">
@@ -635,7 +653,7 @@
         <li><span>1 / 2 / 3</span> Switch wands</li>
         <li><span>4</span> Select turret (click to place)</li>
         <li class="desktop-help"><span>E</span> Buy from shrines or shops</li>
-        <li class="touch-help"><span>Pad</span> Move (always runs) · drag off or around to look</li>
+        <li class="touch-help"><span>Stick</span> Move (always runs) · keeps tracking after you slide off it</li>
         <li class="touch-help"><span>Fire</span> Shoot, or auto-fires on a target</li>
       </ul>
       <p style="margin-bottom:16px">Break crates for coins, visit shrines, the turret shop, and the healer for extra hearts. Defeat 25 dinos to summon the Tyrant!</p>
@@ -4353,6 +4371,7 @@ window.addEventListener("resize", () => {
   applyRendererQuality();
   renderer.setSize(innerWidth, innerHeight);
   updateRotateHint();
+  if (typeof measureDpadHome === "function") measureDpadHome();
 });
 window.addEventListener("orientationchange", () => {
   setTimeout(() => {
@@ -4361,6 +4380,7 @@ window.addEventListener("orientationchange", () => {
     applyRendererQuality();
     renderer.setSize(innerWidth, innerHeight);
     updateRotateHint();
+    if (typeof measureDpadHome === "function") measureDpadHome();
   }, 80);
 });
 
@@ -4373,8 +4393,17 @@ const touchBuyBtn = $("touch-buy");
 const touchPauseBtn = $("touch-pause");
 const rotateHintEl = $("rotate-hint");
 const LOOK_SENS = 0.0036;
-const DPAD_DEAD = 0.18;
-const DPAD_LEAVE = 1.28;
+const DPAD_DEAD = 0.14;
+const DPAD_FOLLOW = 1.0;
+const stickState = {
+  originX: 0,
+  originY: 0,
+  homeX: 0,
+  homeY: 0,
+  rad: 80,
+  active: false,
+  homeReady: false,
+};
 
 function updateRotateHint() {
   if (!rotateHintEl) return;
@@ -4403,39 +4432,104 @@ if (window.matchMedia && matchMedia("(pointer: coarse)").matches) {
 }
 window.addEventListener("touchstart", () => enableTouchMode(), { passive: true, once: false });
 
+function measureDpadHome() {
+  if (!touchDpad) return;
+  touchDpad.classList.remove("returning");
+  const prev = touchDpad.style.transform;
+  touchDpad.style.transition = "none";
+  touchDpad.style.transform = "";
+  const r = touchDpad.getBoundingClientRect();
+  stickState.homeX = r.left + r.width / 2;
+  stickState.homeY = r.top + r.height / 2;
+  stickState.rad = Math.max(24, Math.min(r.width, r.height) / 2);
+  stickState.homeReady = r.width > 0 && r.height > 0;
+  touchDpad.style.transition = "";
+  if (stickState.active) {
+    placeDpadAtOrigin();
+  } else {
+    touchDpad.style.transform = "";
+  }
+}
+
+function setDpadOffset(ox, oy, animate) {
+  if (!touchDpad) return;
+  touchDpad.classList.toggle("returning", !!animate);
+  touchDpad.style.transform = (ox === 0 && oy === 0) ? "" : "translate(" + ox + "px, " + oy + "px)";
+}
+
+function placeDpadAtOrigin() {
+  setDpadOffset(stickState.originX - stickState.homeX, stickState.originY - stickState.homeY, false);
+}
+
+function resetDpadHome(animate) {
+  stickState.active = false;
+  stickState.originX = stickState.homeX;
+  stickState.originY = stickState.homeY;
+  setDpadOffset(0, 0, animate);
+  updateDpadNub(0, 0);
+}
+
+function clampStickOrigin(x, y) {
+  const rad = stickState.rad;
+  const minX = rad + 6;
+  const maxX = Math.max(minX, Math.min(innerWidth - rad - 6, innerWidth * 0.64));
+  const minY = rad + 6;
+  const maxY = Math.max(minY, innerHeight - rad - 6);
+  return {
+    x: Math.max(minX, Math.min(maxX, x)),
+    y: Math.max(minY, Math.min(maxY, y)),
+  };
+}
+
 function clearTouchPointers() {
   touchPointers.clear();
   touchStick.x = 0;
   touchStick.y = 0;
   fireHeld = false;
   if (touchFireBtn) touchFireBtn.classList.remove("held");
-  updateDpadNub(0, 0);
+  if (touchDpad) measureDpadHome();
+  resetDpadHome(false);
 }
 
 function updateDpadNub(x, y) {
   if (!dpadNub) return;
-  const max = 28;
+  const size = (stickState.rad * 2) || (touchDpad && touchDpad.offsetWidth) || 160;
+  const max = size * 0.31;
   dpadNub.style.transform = "translate(calc(-50% + " + (x * max) + "px), calc(-50% + " + (-y * max) + "px))";
 }
 
-function dpadCenter() {
-  const r = touchDpad.getBoundingClientRect();
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2, rad: Math.min(r.width, r.height) / 2 };
-}
-
 function applyStickFromPoint(clientX, clientY) {
-  const c = dpadCenter();
-  let dx = (clientX - c.x) / c.rad;
-  let dy = (c.y - clientY) / c.rad; // up is forward (+)
+  const rad = stickState.rad || 80;
+  const px = clientX - stickState.originX;
+  const py = clientY - stickState.originY;
+  const pmag = Math.hypot(px, py);
+  let dx = px / rad;
+  let dy = -py / rad; // up is forward (+)
   const mag = Math.hypot(dx, dy);
-  if (mag < DPAD_DEAD) { touchStick.x = 0; touchStick.y = 0; updateDpadNub(0, 0); return mag; }
-  const n = Math.min(1, mag);
-  dx = (dx / mag) * n;
-  dy = (dy / mag) * n;
-  touchStick.x = dx;
-  touchStick.y = dy;
-  updateDpadNub(dx, dy);
-  return mag;
+
+  // CoD-style: once past the rim, the base follows so the finger stays on the edge.
+  if (mag > DPAD_FOLLOW && pmag > 0) {
+    const followR = rad * Math.max(1, DPAD_FOLLOW);
+    const clamped = clampStickOrigin(clientX - (px / pmag) * followR, clientY - (py / pmag) * followR);
+    stickState.originX = clamped.x;
+    stickState.originY = clamped.y;
+    placeDpadAtOrigin();
+    dx = (clientX - stickState.originX) / rad;
+    dy = (stickState.originY - clientY) / rad;
+  }
+
+  const mag2 = Math.hypot(dx, dy);
+  if (mag2 < DPAD_DEAD) {
+    touchStick.x = 0;
+    touchStick.y = 0;
+    updateDpadNub(0, 0);
+    return mag2;
+  }
+  const n = Math.min(1, mag2);
+  touchStick.x = (dx / mag2) * n;
+  touchStick.y = (dy / mag2) * n;
+  updateDpadNub(touchStick.x, touchStick.y);
+  return mag2;
 }
 
 function isUiControl(target) {
@@ -4542,26 +4636,75 @@ function updateTouchChrome() {
   }
   if (touchUi) {
     const vis = state === "playing";
+    const wasHidden = touchUi.classList.contains("hidden");
     touchUi.classList.toggle("hidden", !vis);
     touchUi.setAttribute("aria-hidden", vis ? "false" : "true");
+    if (vis && (wasHidden || !stickState.homeReady) && !stickState.active) {
+      requestAnimationFrame(() => { if (!stickState.active) measureDpadHome(); });
+    }
   }
   document.body.classList.toggle("touch-aim", state === "playing" && activeWand !== 4 && hostileUnderCrosshair());
 }
 
 function refreshMoveFromPointers() {
-  let moving = false;
   for (const rec of touchPointers.values()) {
     if (rec.role === "move") {
       applyStickFromPoint(rec.x, rec.y);
-      moving = true;
-      break;
+      return;
     }
   }
-  if (!moving) {
-    touchStick.x = 0;
-    touchStick.y = 0;
-    updateDpadNub(0, 0);
+  touchStick.x = 0;
+  touchStick.y = 0;
+  updateDpadNub(0, 0);
+}
+
+function hasMovePointer() {
+  for (const rec of touchPointers.values()) {
+    if (rec.role === "move") return true;
   }
+  return false;
+}
+
+function pointerInMoveZone(target, clientX, clientY) {
+  if (target && target.closest && (target.closest("#touch-dpad") || target.closest("#touch-move-zone"))) {
+    return true;
+  }
+  const zone = document.getElementById("touch-move-zone") || touchDpad;
+  if (!zone) return false;
+  const r = zone.getBoundingClientRect();
+  return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+}
+
+function beginMovePointer(e) {
+  measureDpadHome();
+  if (touchDpad) touchDpad.classList.remove("returning");
+  const dist = Math.hypot(e.clientX - stickState.homeX, e.clientY - stickState.homeY);
+  if (dist <= stickState.rad * 1.02) {
+    stickState.originX = stickState.homeX;
+    stickState.originY = stickState.homeY;
+  } else {
+    const c = clampStickOrigin(e.clientX, e.clientY);
+    stickState.originX = c.x;
+    stickState.originY = c.y;
+    placeDpadAtOrigin();
+  }
+  stickState.active = true;
+  applyStickFromPoint(e.clientX, e.clientY);
+  const capEl = touchDpad || document.getElementById("touch-move-zone");
+  if (capEl && capEl.setPointerCapture) {
+    try { capEl.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  }
+}
+
+function endMoveIfIdle() {
+  if (hasMovePointer()) {
+    refreshMoveFromPointers();
+    return;
+  }
+  touchStick.x = 0;
+  touchStick.y = 0;
+  if (!stickState.homeReady) measureDpadHome();
+  resetDpadHome(true);
 }
 
 function onTouchPointerDown(e) {
@@ -4569,15 +4712,11 @@ function onTouchPointerDown(e) {
   enableTouchMode();
   if (state !== "playing") return;
   if (isUiControl(e.target)) return;
-  const onDpad = !!(e.target && e.target.closest && e.target.closest("#touch-dpad"));
-  const rec = { role: onDpad ? "move" : "look", x: e.clientX, y: e.clientY };
+  const onMove = pointerInMoveZone(e.target, e.clientX, e.clientY);
+  if (onMove && hasMovePointer()) return;
+  const rec = { role: onMove ? "move" : "look", x: e.clientX, y: e.clientY };
   touchPointers.set(e.pointerId, rec);
-  if (onDpad) {
-    applyStickFromPoint(e.clientX, e.clientY);
-    if (touchDpad && touchDpad.setPointerCapture) {
-      try { touchDpad.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-    }
-  }
+  if (onMove) beginMovePointer(e);
 }
 
 function onTouchPointerMove(e) {
@@ -4588,14 +4727,7 @@ function onTouchPointerMove(e) {
   rec.x = e.clientX;
   rec.y = e.clientY;
   if (rec.role === "move") {
-    const mag = applyStickFromPoint(e.clientX, e.clientY);
-    const c = dpadCenter();
-    if (mag > DPAD_LEAVE || Math.hypot(e.clientX - c.x, e.clientY - c.y) > c.rad * DPAD_LEAVE) {
-      rec.role = "look";
-      touchStick.x = 0;
-      touchStick.y = 0;
-      updateDpadNub(0, 0);
-    }
+    applyStickFromPoint(e.clientX, e.clientY);
     return;
   }
   if (rec.role === "look") applyLookDelta(dx, dy);
@@ -4604,13 +4736,18 @@ function onTouchPointerMove(e) {
 function onTouchPointerUp(e) {
   if (!touchPointers.has(e.pointerId)) return;
   touchPointers.delete(e.pointerId);
-  refreshMoveFromPointers();
+  endMoveIfIdle();
 }
 
 window.addEventListener("pointerdown", onTouchPointerDown, { capture: true });
 window.addEventListener("pointermove", onTouchPointerMove, { capture: true });
 window.addEventListener("pointerup", onTouchPointerUp, { capture: true });
 window.addEventListener("pointercancel", onTouchPointerUp, { capture: true });
+if (touchDpad) {
+  touchDpad.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "transform") touchDpad.classList.remove("returning");
+  });
+}
 
 document.addEventListener("touchmove", (e) => {
   if (touchMode) e.preventDefault();
@@ -5196,6 +5333,7 @@ window.__dinoWand = {
   get touchMode() { return touchMode; },
   get touchStick() { return touchStick; },
   get touchRun() { return touchMode; },
+  get stickState() { return stickState; },
   hostileUnderCrosshair,
   inShopZone,
   isCombatFrozen,
