@@ -2406,19 +2406,118 @@ function createDinoModel(color, isBoss = false) {
   };
 }
 
-function dinoSpawnPoint(awayFromPlayer) {
-  for (let i = 0; i < 40; i++) {
-    const ang = rand() * Math.PI * 2;
-    const rad = awayFromPlayer ? randRange(22, WORLD_HALF - 4) : randRange(12, WORLD_HALF - 6);
-    const x = Math.cos(ang) * rad;
-    const z = Math.sin(ang) * rad;
-    const px = camera.position.x;
-    const pz = camera.position.z;
-    if (awayFromPlayer && Math.hypot(x - px, z - pz) < 14) continue;
-    if (overlaps(x, z, 0.5, 0.5, 1.0) && awayFromPlayer) continue;
-    if (Math.abs(x) < WORLD_HALF - 3 && Math.abs(z) < WORLD_HALF - 3) return { x, z };
+const SPAWN_MIN_EASY = 20;
+const SPAWN_MIN_HARD = 32;
+const spawnLookDir = new THREE.Vector3();
+
+function spawnMinDist() {
+  return difficulty === "hard" ? SPAWN_MIN_HARD : SPAWN_MIN_EASY;
+}
+
+function inWorldSpawn(x, z) {
+  return Math.abs(x) < WORLD_HALF - 3 && Math.abs(z) < WORLD_HALF - 3;
+}
+
+function isSpawnInView(x, z) {
+  camera.getWorldDirection(spawnLookDir);
+  spawnLookDir.y = 0;
+  if (spawnLookDir.lengthSq() < 1e-6) spawnLookDir.set(0, 0, -1);
+  spawnLookDir.normalize();
+  const dx = x - camera.position.x;
+  const dz = z - camera.position.z;
+  const len = Math.hypot(dx, dz);
+  if (len < 1e-4) return true;
+  const dot = (dx * spawnLookDir.x + dz * spawnLookDir.z) / len;
+  const vFov = (camera.fov * Math.PI) / 180;
+  const halfH = Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  return dot > Math.cos(halfH);
+}
+
+function isSpawnHidden(x, z) {
+  const dx = x - camera.position.x;
+  const dz = z - camera.position.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 2) return false;
+  spawnLookDir.set(dx / dist, 0, dz / dist);
+  return rayBlocked(camera.position, spawnLookDir, dist);
+}
+
+function scoreSpawn(x, z, minDist, checkOverlap) {
+  if (!inWorldSpawn(x, z)) return -1;
+  if (checkOverlap && overlaps(x, z, 0.5, 0.5, 1.0)) return -1;
+  const dist = Math.hypot(x - camera.position.x, z - camera.position.z);
+  if (dist < minDist) return -1;
+  let score = 1;
+  if (!isSpawnInView(x, z)) score += 3;
+  if (checkOverlap && isSpawnHidden(x, z)) score += 2;
+  // Slight preference for sitting comfortably beyond the minimum, not across the map.
+  score += Math.min(2, Math.max(0, dist - minDist) * 0.08);
+  return score;
+}
+
+function pickHostileSpawnPoint(minDist, checkOverlap) {
+  camera.updateMatrixWorld();
+  const px = camera.position.x;
+  const pz = camera.position.z;
+  const pool = [];
+  let fallback = null;
+  let fallbackD = -1;
+
+  function consider(x, z) {
+    x = Math.max(-WORLD_HALF + 4, Math.min(WORLD_HALF - 4, x));
+    z = Math.max(-WORLD_HALF + 4, Math.min(WORLD_HALF - 4, z));
+    if (!inWorldSpawn(x, z)) return;
+    const blocked = checkOverlap && overlaps(x, z, 0.5, 0.5, 1.0);
+    const dist = Math.hypot(x - px, z - pz);
+    if (!blocked && dist > fallbackD) {
+      fallbackD = dist;
+      fallback = { x, z };
+    }
+    const score = scoreSpawn(x, z, minDist, checkOverlap);
+    if (score >= 0) pool.push({ x, z, score });
   }
-  return { x: WORLD_HALF - 6, z: WORLD_HALF - 6 };
+
+  for (let i = 0; i < 50; i++) {
+    const ang = rand() * Math.PI * 2;
+    const rad = randRange(minDist, minDist + 22);
+    consider(px + Math.cos(ang) * rad, pz + Math.sin(ang) * rad);
+  }
+
+  camera.getWorldDirection(spawnLookDir);
+  spawnLookDir.y = 0;
+  if (spawnLookDir.lengthSq() < 1e-6) spawnLookDir.set(0, 0, -1);
+  spawnLookDir.normalize();
+  const fx = spawnLookDir.x, fz = spawnLookDir.z;
+  for (const d of [minDist, minDist + 8, minDist + 16]) {
+    consider(px - fx * d, pz - fz * d);
+    consider(px - fx * d + fz * 8, pz - fz * d - fx * 8);
+    consider(px - fx * d - fz * 8, pz - fz * d + fx * 8);
+  }
+
+  if (pool.length) {
+    let sum = 0;
+    for (const c of pool) sum += c.score;
+    let pick = rand() * sum;
+    for (const c of pool) {
+      pick -= c.score;
+      if (pick <= 0) return { x: c.x, z: c.z };
+    }
+    const last = pool[pool.length - 1];
+    return { x: last.x, z: last.z };
+  }
+
+  if (fallback) return fallback;
+  const edge = WORLD_HALF - 6;
+  let cx = edge, cz = edge, cd = -1;
+  for (const [x, z] of [[edge, edge], [edge, -edge], [-edge, edge], [-edge, -edge]]) {
+    const dist = Math.hypot(x - px, z - pz);
+    if (dist > cd) { cd = dist; cx = x; cz = z; }
+  }
+  return { x: cx, z: cz };
+}
+
+function dinoSpawnPoint(awayFromPlayer) {
+  return pickHostileSpawnPoint(spawnMinDist(), true);
 }
 
 let alertTex = null;
@@ -2640,14 +2739,9 @@ function createPteraModel() {
 }
 
 function pteraSpawnPoint() {
-  const ang = rand() * Math.PI * 2;
-  const dist = randRange(18, 32);
-  let x = camera.position.x + Math.sin(ang) * dist;
-  let z = camera.position.z + Math.cos(ang) * dist;
-  x = Math.max(-WORLD_HALF + 4, Math.min(WORLD_HALF - 4, x));
-  z = Math.max(-WORLD_HALF + 4, Math.min(WORLD_HALF - 4, z));
+  const spot = pickHostileSpawnPoint(spawnMinDist(), false);
   const y = randRange(PTERA_ALT_MIN + 1, PTERA_ALT_MAX - 1);
-  return { x, y, z };
+  return { x: spot.x, y, z: spot.z };
 }
 
 function pteraCap() {
@@ -4392,7 +4486,8 @@ const touchFireBtn = $("touch-fire");
 const touchBuyBtn = $("touch-buy");
 const touchPauseBtn = $("touch-pause");
 const rotateHintEl = $("rotate-hint");
-const LOOK_SENS = 0.0036;
+const LOOK_SENS = 0.008; // was 0.0036; ~2.22x so mobile look can keep up
+const LOOK_ACCEL = 0.12; // mild flick boost, up to ~2.5x the old rate
 const DPAD_DEAD = 0.14;
 const DPAD_FOLLOW = 1.0;
 const stickState = {
@@ -4546,8 +4641,10 @@ function isUiControl(target) {
 }
 
 function applyLookDelta(dx, dy) {
-  yaw -= dx * LOOK_SENS;
-  pitch -= dy * LOOK_SENS;
+  const mag = Math.hypot(dx, dy);
+  const accel = 1 + LOOK_ACCEL * Math.min(1, Math.max(0, (mag - 6) / 48));
+  yaw -= dx * LOOK_SENS * accel;
+  pitch -= dy * LOOK_SENS * accel;
   const lim = Math.PI / 2 - 0.08;
   if (pitch > lim) pitch = lim;
   if (pitch < -lim) pitch = -lim;
@@ -5343,6 +5440,14 @@ window.__dinoWand = {
   aggroPtera,
   hurtDino,
   WAND_DEFS,
+  LOOK_SENS,
+  LOOK_ACCEL,
+  applyLookDelta,
+  get yaw() { return yaw; },
+  get pitch() { return pitch; },
+  spawnMinDist,
+  dinoSpawnPoint,
+  pteraSpawnPoint,
   startSpot,
   spawnDino,
   triggerBoss,
