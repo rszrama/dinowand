@@ -25,7 +25,7 @@ Choose **Easy** or **Hard** on the start, death, or victory screen. Shops (the t
 - Drag anywhere else that isn’t a button to look around
 - Auto-fires when a hostile is under the crosshair; hold **Fire** to shoot (or place a turret when that slot is active)
 - Tap wand / turret slots **1–4**; a **Buy** button appears in shop zones; **Pause** to pause
-- On supported browsers, **Play** / **Play Again** goes full screen and locks to landscape (use the **Full** button if you leave full screen). In portrait, a small banner suggests rotating — you can dismiss it and keep playing
+- On phones and tablets, **Play** / **Play Again** goes full screen and locks to landscape (use the **Full** button if you leave full screen). Desktop keeps the usual click-to-lock mouse look and does not go full screen automatically. In portrait, a small banner suggests rotating — you can dismiss it and keep playing
 - **iPhone:** Safari can't go full screen in the browser. Open the **Share** sheet and choose **Add to Home Screen**, then launch Dino Wand from that icon — it runs full screen in landscape. Keep the Ring/Silent switch off, or use the home-screen app, so game audio isn't muted
 
 Open `index.html` locally if you prefer — no build step or install. For the home-screen app and full screen, serve it over `https://`.
