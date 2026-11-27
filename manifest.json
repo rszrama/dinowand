@@ -1,0 +1,23 @@
+{
+  "name": "Dino Wand",
+  "short_name": "Dino Wand",
+  "description": "A low-poly first-person browser game: explore a village, shoot your wand, collect coins, and take down dinosaurs.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1a2a1a",
+  "theme_color": "#1a2a1a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

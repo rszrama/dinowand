@@ -25,10 +25,11 @@ Choose **Easy** or **Hard** on the start, death, or victory screen. Shops (the t
 - Drag anywhere else that isn’t a button to look around
 - Auto-fires when a hostile is under the crosshair; hold **Fire** to shoot (or place a turret when that slot is active)
 - Tap wand / turret slots **1–4**; a **Buy** button appears in shop zones; **Pause** to pause
-- Landscape is recommended (still playable in portrait)
+- On supported browsers, **Play** / **Play Again** goes full screen and locks to landscape (use the **Full** button if you leave full screen). If a rotate prompt appears, turn the phone sideways
+- **iPhone:** Safari can't go full screen in the browser. Open the **Share** sheet and choose **Add to Home Screen**, then launch Dino Wand from that icon — it runs full screen in landscape. Keep the Ring/Silent switch off, or use the home-screen app, so game audio isn't muted
 
-Open `index.html` locally if you prefer — no build step or install.
+Open `index.html` locally if you prefer — no build step or install. For the home-screen app and full screen, serve it over `https://`.
 
 ## Technical notes
 
-Single HTML file using [three.js](https://threejs.org/) r160 from a CDN. All models, sounds, and textures are generated in the page (no extra asset fetches besides three.js). Works over `https://` or `file://`.
+Single HTML file using [three.js](https://threejs.org/) r160 from a CDN. All models, sounds, and textures are generated in the page. A small `manifest.json` and icons are included so you can add it to a home screen. Works over `https://` or `file://`.
