@@ -10,6 +10,8 @@ Dinosaurs spawn, alert their pack, and hunt you down. Collect coins from crates 
 
 Choose **Easy** or **Hard** on the start, death, or victory screen. Shops (the turret keeper, the healer, and the wand shrines) are safe zones — hostiles pause while you buy.
 
+A translucent bar just above the wand / turret buttons shows the direction of hostiles that have spotted you. The center is straight ahead; the ends are almost directly behind you (179° left or right). The scale is tighter in front, so a small move near the center is a smaller angle than the same move near an edge. Each alerted, charging, diving, or attacking dino, raptor, pterodactyl, or the boss gets a dot — wanderers do not. The boss dot is larger and red, pterodactyls are cyan, and closer threats appear brighter and can pulse. The bar stays very faint when nothing is after you.
+
 ## Controls
 
 ### Desktop

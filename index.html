@@ -275,13 +275,99 @@
     }
     #mode-badge[data-mode="easy"] { color: #8fe8a8; }
     #mode-badge[data-mode="hard"] { color: #ff9a5c; }
-    #wand-bar {
+    #loadout {
       position: absolute;
       left: 50%;
       bottom: max(44px, calc(env(safe-area-inset-bottom) + 36px));
       transform: translateX(-50%);
       display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #wand-bar {
+      position: relative;
+      display: flex;
       gap: 8px;
+      justify-content: center;
+    }
+    #threat-bar {
+      position: relative;
+      height: 16px;
+      border-radius: 8px;
+      background: rgba(8, 14, 10, 0.38);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      opacity: 0.16;
+      transition: opacity 0.18s ease;
+      overflow: hidden;
+    }
+    #threat-bar.active {
+      opacity: 1;
+    }
+    #threat-track {
+      position: absolute;
+      left: 9px;
+      right: 9px;
+      top: 0;
+      bottom: 0;
+    }
+    .threat-tick {
+      position: absolute;
+      top: 50%;
+      width: 1px;
+      height: 8px;
+      margin-left: -0.5px;
+      background: rgba(255, 255, 255, 0.28);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .threat-tick[data-deg="0"] {
+      height: 11px;
+      width: 2px;
+      margin-left: -1px;
+      background: rgba(255, 229, 138, 0.55);
+    }
+    #threat-dots {
+      position: absolute;
+      inset: 0;
+    }
+    .threat-dot {
+      position: absolute;
+      top: 50%;
+      left: calc(50% + var(--tx) * 50%);
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(var(--ts, 1));
+      background: #ffd24a;
+      box-shadow: 0 0 6px 1px rgba(255, 210, 74, 0.75);
+      opacity: var(--to, 1);
+      pointer-events: none;
+    }
+    .threat-dot.ptera {
+      background: #7be7ff;
+      box-shadow: 0 0 7px 1px rgba(123, 231, 255, 0.8);
+    }
+    .threat-dot.raptor {
+      background: #b6f59a;
+      box-shadow: 0 0 6px 1px rgba(182, 245, 154, 0.75);
+    }
+    .threat-dot.boss {
+      width: 14px;
+      height: 14px;
+      background: #ff4a2a;
+      box-shadow: 0 0 8px 2px rgba(255, 74, 42, 0.85);
+      border: 1px solid rgba(255, 230, 180, 0.7);
+    }
+    .threat-dot.pulse {
+      animation: threatPulse 0.5s ease-in-out infinite;
+    }
+    @keyframes threatPulse {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.55); }
     }
     .wand-slot {
       position: relative;
@@ -362,7 +448,7 @@
     }
     #toast.show { opacity: 1; }
     #interact-prompt {
-      bottom: 132px;
+      bottom: 154px;
       font-size: 16px;
       color: #f4f0e4;
       background: rgba(8,14,10,0.55);
@@ -598,9 +684,12 @@
       box-shadow: 0 2px 0 #a67c18;
       flex: 0 0 auto;
     }
+    body.touch-mode #loadout {
+      bottom: max(8px, env(safe-area-inset-bottom));
+      z-index: 7;
+    }
     body.touch-mode #wand-bar {
       pointer-events: auto;
-      bottom: max(8px, env(safe-area-inset-bottom));
       gap: 5px;
       z-index: 7;
     }
@@ -717,6 +806,19 @@
     <div id="cooldown-ring"></div>
     <div id="toast"></div>
     <div id="interact-prompt" class="hidden"></div>
+    <div id="loadout">
+    <div id="threat-bar" class="" aria-hidden="true">
+      <div id="threat-track">
+        <span class="threat-tick" data-deg="-135"></span>
+        <span class="threat-tick" data-deg="-90"></span>
+        <span class="threat-tick" data-deg="-45"></span>
+        <span class="threat-tick" data-deg="0"></span>
+        <span class="threat-tick" data-deg="45"></span>
+        <span class="threat-tick" data-deg="90"></span>
+        <span class="threat-tick" data-deg="135"></span>
+        <div id="threat-dots"></div>
+      </div>
+    </div>
     <div id="wand-bar">
       <div class="wand-slot unlocked active" data-slot="1">
         <div class="key">1</div>
@@ -742,6 +844,7 @@
         <div class="price">0 · 8c</div>
         <div class="cd-fill"></div>
       </div>
+    </div>
     </div>
     <div id="hint">WASD move · Shift run · 1–3 wands · 4 turret · E buy · Click shoot/place</div>
   </div>
@@ -4368,6 +4471,106 @@ function onFullscreenChange() {
   relockPointerIfNeeded();
 }
 
+
+const THREAT_ANGLE_MAX = 179;
+const THREAT_PULSE_DIST = 8;
+const DINO_THREAT_MODES = { hunt: true, telegraph: true, charge: true, recover: true };
+const PTERA_THREAT_MODES = { approach: true, circle: true, telegraph: true, dive: true, climb: true };
+const threatBarEl = $("threat-bar");
+const threatDotsEl = $("threat-dots");
+
+function threatAngleToX(angleDeg) {
+  const a = Math.max(-THREAT_ANGLE_MAX, Math.min(THREAT_ANGLE_MAX, angleDeg));
+  if (a === 0) return 0;
+  return Math.sign(a) * Math.sqrt(Math.abs(a) / THREAT_ANGLE_MAX);
+}
+
+function signedThreatAngle(x, z) {
+  const dx = x - camera.position.x;
+  const dz = z - camera.position.z;
+  const len = Math.hypot(dx, dz);
+  if (len < 1e-6) return 0;
+  const fx = -Math.sin(yaw);
+  const fz = -Math.cos(yaw);
+  const tx = dx / len;
+  const tz = dz / len;
+  const dot = fx * tx + fz * tz;
+  const cross = fx * tz - fz * tx;
+  return Math.atan2(cross, dot) * (180 / Math.PI);
+}
+
+function isDinoThreatening(d) {
+  if (!d || !d.alive || d.hp <= 0) return false;
+  if (d.targetKind === "turret") return false;
+  return !!DINO_THREAT_MODES[d.mode];
+}
+
+function isPteraThreatening(p) {
+  if (!p || !p.alive || p.falling || p.finished || p.hp <= 0) return false;
+  if (p.aggroKind === "turret") return false;
+  return !!PTERA_THREAT_MODES[p.mode];
+}
+
+function threatKindForDino(d) {
+  if (d.isBoss) return "boss";
+  if (d.isRaptor || d.kind === "raptor") return "raptor";
+  return "dino";
+}
+
+function placeThreatTicks() {
+  if (!threatBarEl) return;
+  threatBarEl.querySelectorAll(".threat-tick").forEach((tick) => {
+    const deg = Number(tick.getAttribute("data-deg"));
+    tick.style.left = ((threatAngleToX(deg) + 1) * 50) + "%";
+  });
+}
+
+function collectThreats() {
+  const list = [];
+  if (state !== "playing") return list;
+  for (const d of dinos) {
+    if (!isDinoThreatening(d)) continue;
+    list.push({ kind: threatKindForDino(d), x: d.root.position.x, z: d.root.position.z });
+  }
+  for (const p of pteras) {
+    if (!isPteraThreatening(p)) continue;
+    list.push({ kind: "ptera", x: p.root.position.x, z: p.root.position.z });
+  }
+  return list;
+}
+
+function updateThreatBar() {
+  if (!threatBarEl || !threatDotsEl) return;
+  const threats = collectThreats();
+  const active = threats.length > 0;
+  threatBarEl.classList.toggle("active", active);
+  threatBarEl.setAttribute("aria-hidden", active ? "false" : "true");
+  threatDotsEl.replaceChildren();
+  if (!active) return;
+  const frag = document.createDocumentFragment();
+  for (const t of threats) {
+    const angle = signedThreatAngle(t.x, t.z);
+    const tx = threatAngleToX(angle);
+    const dist = Math.hypot(t.x - camera.position.x, t.z - camera.position.z);
+    const closeness = Math.max(0, Math.min(1, 1 - (dist - 4) / 38));
+    const scale = 0.62 + 0.5 * closeness;
+    const opacity = 0.42 + 0.58 * closeness;
+    const el = document.createElement("div");
+    el.className = "threat-dot " + t.kind + (dist <= THREAT_PULSE_DIST ? " pulse" : "");
+    el.style.setProperty("--tx", tx.toFixed(4));
+    el.style.setProperty("--ts", scale.toFixed(3));
+    el.style.setProperty("--to", opacity.toFixed(3));
+    el.dataset.kind = t.kind;
+    el.dataset.angle = angle.toFixed(2);
+    el.dataset.dist = dist.toFixed(2);
+    el.dataset.tx = tx.toFixed(4);
+    frag.appendChild(el);
+  }
+  threatDotsEl.appendChild(frag);
+}
+
+placeThreatTicks();
+
 function startPlay(lock = true) {
   ensureAudio();
   if (shouldAutoFullscreen()) requestGameFullscreen();
@@ -5771,6 +5974,7 @@ function animate() {
   updateShopkeeper(dt);
   updateDinos(dt);
   updatePteras(dt);
+  updateThreatBar();
   renderer.render(scene, camera);
 }
 
@@ -5872,6 +6076,13 @@ window.__dinoWand = {
   setDifficulty,
   isSolidAt,
   dinoTakeCoin,
+  threatAngleToX,
+  signedThreatAngle,
+  updateThreatBar,
+  collectThreats,
+  isDinoThreatening,
+  isPteraThreatening,
+  THREAT_ANGLE_MAX,
 };
 animate();
   </script>
