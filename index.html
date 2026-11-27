@@ -159,10 +159,23 @@
       justify-content: center;
       background: rgba(8, 16, 10, 0.62);
       backdrop-filter: blur(3px);
+      padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
     }
     .overlay.hidden { display: none; }
     .panel {
-      width: min(460px, calc(100% - 40px));
+      width: min(460px, 100%);
+      margin: auto;
+      max-height: 100vh;
+      max-height: 100dvh;
+      max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
       padding: 36px 32px 28px;
       text-align: center;
       background: linear-gradient(180deg, #2d4a2c 0%, #1d301c 100%);
@@ -524,37 +537,43 @@
     #touch-fs.hidden { display: none; }
     #rotate-overlay {
       position: fixed;
-      inset: 0;
-      z-index: 20;
+      top: max(8px, env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 21;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-direction: column;
-      gap: 18px;
-      background: rgba(8, 16, 10, 0.94);
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      width: min(520px, calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+      padding: 8px 10px;
+      background: rgba(8, 14, 10, 0.88);
+      border: 1px solid rgba(255, 229, 138, 0.45);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
       pointer-events: auto;
       touch-action: manipulation;
-      padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
       text-align: center;
     }
     #rotate-overlay.hidden { display: none; }
     #rotate-overlay .rotate-phone {
-      width: 46px;
-      height: 76px;
-      border: 3px solid #ffe58a;
-      border-radius: 8px;
-      box-shadow: 0 3px 0 #6a4a10;
+      width: 18px;
+      height: 28px;
+      border: 2px solid #ffe58a;
+      border-radius: 4px;
       position: relative;
+      flex: 0 0 auto;
       animation: rotatePhone 1.6s ease-in-out infinite;
     }
     #rotate-overlay .rotate-phone::after {
       content: "";
       position: absolute;
       left: 50%;
-      bottom: 7px;
-      width: 8px;
-      height: 8px;
-      margin-left: -4px;
+      bottom: 3px;
+      width: 4px;
+      height: 4px;
+      margin-left: -2px;
       border-radius: 50%;
       background: #ffe58a;
     }
@@ -564,12 +583,20 @@
       100% { transform: rotate(0deg); }
     }
     #rotate-overlay p {
-      font-size: 22px;
+      font-size: 13px;
       font-weight: 700;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.03em;
       color: #ffe58a;
-      text-shadow: 0 3px 0 #6a4a10;
-      max-width: 16em;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+      margin: 0;
+      flex: 1 1 auto;
+    }
+    #rotate-dismiss {
+      padding: 6px 10px;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      box-shadow: 0 2px 0 #a67c18;
+      flex: 0 0 auto;
     }
     body.touch-mode #wand-bar {
       pointer-events: auto;
@@ -588,7 +615,10 @@
     body.touch-aim #crosshair::before, body.touch-aim #crosshair::after {
       background: #ff9a5c;
     }
-    body.touch-mode .overlay, body.touch-mode .panel, body.touch-mode button {
+    body.touch-mode .overlay, body.touch-mode .panel {
+      touch-action: pan-y;
+    }
+    body.touch-mode button, body.touch-mode #rotate-overlay {
       touch-action: manipulation;
     }
     body.touch-mode .mode-btn, body.touch-mode .panel button {
@@ -607,6 +637,59 @@
         width: min(56vw, 32vh, 230px);
         height: min(56vw, 32vh, 230px);
       }
+    }
+    /* Short landscape (phones on their side): shrink the dialogs so Play stays on-screen. */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .overlay {
+        padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+        align-items: stretch;
+      }
+      .panel {
+        width: min(760px, 100%);
+        padding: 12px 16px 12px;
+      }
+      .panel h1 {
+        font-size: 26px;
+        letter-spacing: 0.08em;
+        margin-bottom: 2px;
+        text-shadow: 0 2px 0 #6a4a10;
+      }
+      .panel .tag { font-size: 12px; margin-bottom: 8px; }
+      .panel p, .panel li { font-size: 13px; line-height: 1.35; }
+      .panel p { margin-bottom: 8px !important; }
+      .controls { margin: 0 0 8px; gap: 3px 14px; }
+      .controls li span { min-width: 70px; }
+      .panel .death-title, .panel .victory-title {
+        font-size: 22px;
+        margin-bottom: 4px;
+        text-shadow: 0 2px 0 #5a1810;
+      }
+      .panel .scoreline { font-size: 15px; margin: 2px 0 6px !important; }
+      .mode-row { margin: 0 0 8px; }
+      .action-row { margin-top: 0; }
+      button { padding: 8px 18px; font-size: 14px; }
+      body.touch-mode .mode-btn, body.touch-mode .panel button { min-height: 40px; }
+
+      #overlay-start .panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+        grid-template-areas:
+          "title controls"
+          "tag controls"
+          "blurb controls"
+          "modes controls"
+          "play controls";
+        column-gap: 20px;
+        row-gap: 2px;
+        text-align: left;
+        align-items: start;
+      }
+      #overlay-start .panel > h1 { grid-area: title; }
+      #overlay-start .panel > .tag { grid-area: tag; margin-bottom: 4px; }
+      #overlay-start .panel > .controls { grid-area: controls; margin: 0; align-self: center; }
+      #overlay-start .panel > p { grid-area: blurb; }
+      #overlay-start .panel > .mode-row { grid-area: modes; justify-content: flex-start; margin: 4px 0 6px; }
+      #overlay-start .panel > #btn-start { grid-area: play; justify-self: start; }
     }
   </style>
   <script type="importmap">
@@ -742,7 +825,8 @@
 
   <div id="rotate-overlay" class="hidden" aria-hidden="true">
     <div class="rotate-phone" aria-hidden="true"></div>
-    <p>Rotate your phone to landscape</p>
+    <p>Landscape plays best</p>
+    <button type="button" id="rotate-dismiss">Play anyway</button>
   </div>
 
   <script type="module">
@@ -4696,6 +4780,8 @@ const touchBuyBtn = $("touch-buy");
 const touchPauseBtn = $("touch-pause");
 const touchFsBtn = $("touch-fs");
 const rotateOverlayEl = $("rotate-overlay");
+const rotateDismissBtn = $("rotate-dismiss");
+let rotateHintDismissed = false;
 const LOOK_SENS = 0.008; // was 0.0036; ~2.22x so mobile look can keep up
 const LOOK_ACCEL = 0.12; // mild flick boost, up to ~2.5x the old rate
 const DPAD_DEAD = 0.14;
@@ -4712,10 +4798,15 @@ const stickState = {
 
 function updateRotateHint() {
   if (!rotateOverlayEl) return;
-  const show = touchMode && innerHeight > innerWidth + 24;
+  const show = touchMode && !rotateHintDismissed && innerHeight > innerWidth + 24;
   rotateOverlayEl.classList.toggle("hidden", !show);
   rotateOverlayEl.setAttribute("aria-hidden", show ? "false" : "true");
   updateFullscreenButton();
+}
+
+function dismissRotateHint() {
+  rotateHintDismissed = true;
+  updateRotateHint();
 }
 
 function enableTouchMode() {
@@ -4848,6 +4939,7 @@ function isUiControl(target) {
     target.closest("#touch-fs") ||
     target.closest(".wand-slot") ||
     target.closest(".overlay") ||
+    target.closest("#rotate-overlay") ||
     target.closest(".mode-btn") ||
     target.closest("button")
   );
@@ -5060,7 +5152,10 @@ if (touchDpad) {
 }
 
 document.addEventListener("touchmove", (e) => {
-  if (touchMode) e.preventDefault();
+  if (!touchMode) return;
+  const t = e.target;
+  if (t && t.closest && (t.closest(".overlay") || t.closest(".panel") || t.closest("#rotate-overlay"))) return;
+  e.preventDefault();
 }, { passive: false });
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("contextmenu", (e) => {
@@ -5114,6 +5209,18 @@ if (touchFsBtn) {
     if (isGameFullscreen()) exitGameFullscreen();
     else requestGameFullscreen();
     updateFullscreenButton();
+  });
+}
+
+if (rotateDismissBtn) {
+  rotateDismissBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dismissRotateHint();
+  });
+  rotateDismissBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    dismissRotateHint();
   });
 }
 document.addEventListener("fullscreenchange", updateFullscreenButton);
@@ -5653,6 +5760,8 @@ window.__dinoWand = {
   takeHit,
   updateHeartsHUD,
   enableTouchMode,
+  dismissRotateHint,
+  get rotateHintDismissed() { return rotateHintDismissed; },
   ensureAudio,
   unlockAudio,
   get audioCtx() { return audioCtx; },
