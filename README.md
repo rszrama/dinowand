@@ -6,7 +6,7 @@ A low-poly first-person browser game: explore a village, shoot your wand, collec
 
 ## How to play
 
-Dinosaurs spawn, alert their pack, and hunt you down. Collect coins from crates and kills, then buy new wands, defensive turrets, and extra hearts. After 25 kills the Ancient Tyrant appears.
+Dinosaurs spawn, alert their pack, and hunt you down. Collect coins from crates and kills, then buy new wands, defensive turrets, and extra hearts. After 25 kills the Ancient Tyrant appears. The village layout — houses, shops, shrines, and trees — stays the same every time; crate and dinosaur spawn points are random on each load and each Play Again. When a hostile kills you, the camera turns to face it as the screen fades to red.
 
 Choose **Easy** or **Hard** on the start, death, or victory screen. Shops (the turret keeper, the healer, and the wand shrines) are safe zones — hostiles pause while you buy.
 

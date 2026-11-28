@@ -1398,8 +1398,17 @@ function makeRng(seed) {
   };
 }
 const rand = makeRng(0xd1a064);
-const randRange = (a, b) => a + rand() * (b - a);
-const randChoice = (arr) => arr[(rand() * arr.length) | 0];
+const spawnRand = Math.random;
+function randRangeWith(rng, a, b) {
+  return a + rng() * (b - a);
+}
+function randChoiceWith(rng, arr) {
+  return arr[(rng() * arr.length) | 0];
+}
+const randRange = (a, b) => randRangeWith(rand, a, b);
+const randChoice = (arr) => randChoiceWith(rand, arr);
+const spawnRange = (a, b) => randRangeWith(spawnRand, a, b);
+const spawnChoice = (arr) => randChoiceWith(spawnRand, arr);
 
 function groundTexture() {
   const c = document.createElement("canvas");
@@ -1486,10 +1495,10 @@ function overlaps(x, z, hx, hz, pad = 1.4) {
   return Math.abs(x) > WORLD_HALF - 2 || Math.abs(z) > WORLD_HALF - 2;
 }
 
-function findSpot(hx, hz, maxTries = 80) {
+function findSpot(hx, hz, maxTries = 80, rng = rand) {
   for (let i = 0; i < maxTries; i++) {
-    const x = randRange(-WORLD_HALF + 6, WORLD_HALF - 6);
-    const z = randRange(-WORLD_HALF + 6, WORLD_HALF - 6);
+    const x = randRangeWith(rng, -WORLD_HALF + 6, WORLD_HALF - 6);
+    const z = randRangeWith(rng, -WORLD_HALF + 6, WORLD_HALF - 6);
     if (!overlaps(x, z, hx, hz)) return { x, z };
   }
   return null;
@@ -2427,18 +2436,27 @@ function createCrateMesh() {
 
 function spawnCrate(x, z, respawn = false) {
   if (x == null) {
-    const spot = findSpot(0.55, 0.55, 50);
+    const spot = findSpot(0.55, 0.55, 50, spawnRand);
     if (!spot) return null;
     x = spot.x; z = spot.z;
   }
   const mesh = createCrateMesh();
   mesh.position.set(x, 0, z);
-  mesh.rotation.y = randRange(0, Math.PI * 2);
+  mesh.rotation.y = spawnRange(0, Math.PI * 2);
   scene.add(mesh);
   const col = addCollider("crate", x, z, 0.48, 0.48);
   const crate = { id: ++boxId, mesh, x, z, col, alive: true, respawnAt: 0 };
   crates.push(crate);
   return crate;
+}
+
+function clearAllCrates() {
+  for (const crate of crates) {
+    if (crate.mesh && crate.mesh.parent) scene.remove(crate.mesh);
+    const idx = colliders.indexOf(crate.col);
+    if (idx >= 0) colliders.splice(idx, 1);
+  }
+  crates.length = 0;
 }
 
 for (let i = 0; i < 22; i++) spawnCrate();
@@ -2805,8 +2823,8 @@ function pickHostileSpawnPoint(minDist, checkOverlap) {
   }
 
   for (let i = 0; i < 50; i++) {
-    const ang = rand() * Math.PI * 2;
-    const rad = randRange(minDist, minDist + 22);
+    const ang = spawnRand() * Math.PI * 2;
+    const rad = spawnRange(minDist, minDist + 22);
     consider(px + Math.cos(ang) * rad, pz + Math.sin(ang) * rad);
   }
 
@@ -2824,7 +2842,7 @@ function pickHostileSpawnPoint(minDist, checkOverlap) {
   if (pool.length) {
     let sum = 0;
     for (const c of pool) sum += c.score;
-    let pick = rand() * sum;
+    let pick = spawnRand() * sum;
     for (const c of pool) {
       pick -= c.score;
       if (pick <= 0) return { x: c.x, z: c.z };
@@ -2870,7 +2888,7 @@ function getAlertTexture() {
 function spawnDino(away = false, isBoss = false) {
   const cap = bossSpawned ? MAX_DINOS_BOSS : MAX_DINOS;
   if (!isBoss && dinos.filter((d) => d.alive && !d.isBoss).length >= cap) return;
-  const color = isBoss ? 0x5c1824 : randChoice(DINO_COLORS);
+  const color = isBoss ? 0x5c1824 : spawnChoice(DINO_COLORS);
   const { root, head, tail, legs, arms, neck, body, mats, jaw, eyeW, eyeI, pL, pR, hipY } = createDinoModel(color, isBoss);
   if (isBoss) {
     const glowEye = new THREE.MeshBasicMaterial({ color: 0xff4400 });
@@ -2888,7 +2906,7 @@ function spawnDino(away = false, isBoss = false) {
   }
   const spot = dinoSpawnPoint(away);
   root.position.set(spot.x, 0, spot.z);
-  const scale = isBoss ? 2.85 : randRange(0.9, 1.2);
+  const scale = isBoss ? 2.85 : spawnRange(0.9, 1.2);
   root.scale.setScalar(scale);
   const mark = new THREE.Sprite(new THREE.SpriteMaterial({
     map: getAlertTexture(),
@@ -2925,8 +2943,8 @@ function spawnDino(away = false, isBoss = false) {
     flashUntil: 0,
     wanderT: 0,
     target: new THREE.Vector3(spot.x, 0, spot.z),
-    heading: rand() * Math.PI * 2,
-    anim: rand() * 10,
+    heading: spawnRand() * Math.PI * 2,
+    anim: spawnRand() * 10,
     scale,
     mode: "wander",
     telegraphT: 0,
@@ -2938,7 +2956,7 @@ function spawnDino(away = false, isBoss = false) {
     kbZ: 0,
     passedClose: false,
     chargeSpeed: isBoss ? DINO_CHARGE_SPEED * 0.86 : DINO_CHARGE_SPEED,
-    pitchVar: randRange(-0.14, 0.14),
+    pitchVar: spawnRange(-0.14, 0.14),
     targetKind: "player",
     targetTurret: null,
     biteCooldown: 0,
@@ -3067,7 +3085,7 @@ function createPteraModel() {
 
 function pteraSpawnPoint() {
   const spot = pickHostileSpawnPoint(spawnMinDist(), false);
-  const y = randRange(PTERA_ALT_MIN + 1, PTERA_ALT_MAX - 1);
+  const y = spawnRange(PTERA_ALT_MIN + 1, PTERA_ALT_MAX - 1);
   return { x: spot.x, y, z: spot.z };
 }
 
@@ -3084,7 +3102,7 @@ function spawnPtera() {
   const { root, head, wings, tail, body, mats } = createPteraModel();
   const spot = pteraSpawnPoint();
   root.position.set(spot.x, spot.y, spot.z);
-  const heading = rand() * Math.PI * 2;
+  const heading = spawnRand() * Math.PI * 2;
   root.rotation.y = heading;
   scene.add(root);
   const orig = mats.map((m) => m.color.clone());
@@ -3102,12 +3120,12 @@ function spawnPtera() {
     pitch: 0,
     bank: 0,
     mode: "cruise",
-    anim: rand() * 10,
+    anim: spawnRand() * 10,
     cruiseAlt: spot.y,
     wanderT: 0,
-    circleDir: rand() < 0.5 ? 1 : -1,
+    circleDir: spawnRand() < 0.5 ? 1 : -1,
     target: new THREE.Vector3(spot.x, spot.y, spot.z),
-    cooldownT: randRange(0.8, 2.4),
+    cooldownT: spawnRange(0.8, 2.4),
     telegraphT: 0,
     diveT: 0,
     diveAim: new THREE.Vector3(),
@@ -3302,7 +3320,7 @@ function updatePteras(dt) {
       continue;
     }
     if (!p.alive) continue;
-    if (state !== "playing") continue;
+    if (state !== "playing" && state !== "dead") continue;
 
     if (shopSafe) {
       if (p.freezeY == null) p.freezeY = p.root.position.y;
@@ -4603,7 +4621,9 @@ function pauseGame() {
 
 function requestLock() {
   const el = renderer.domElement;
-  if (el.requestPointerLock) el.requestPointerLock();
+  try {
+    if (el.requestPointerLock) el.requestPointerLock();
+  } catch (err) { /* document may not be eligible for pointer lock */ }
 }
 
 function playEatGrowl() {
@@ -4670,7 +4690,76 @@ function formatTime(sec) {
   return m + ":" + String(r).padStart(2, "0");
 }
 
+const DEATH_LOOK_DURATION = 0.85;
+const _deathQ0 = new THREE.Quaternion();
+const _deathQ1 = new THREE.Quaternion();
+const _deathQ = new THREE.Quaternion();
+const _deathE0 = new THREE.Euler(0, 0, 0, "YXZ");
+const _deathE1 = new THREE.Euler(0, 0, 0, "YXZ");
+const _deathHead = new THREE.Vector3();
+let deathLook = null;
+
+function killerHeadPosition(killer, out) {
+  const target = out || new THREE.Vector3();
+  if (!killer || !killer.root) return null;
+  if (killer.head && killer.head.getWorldPosition) {
+    killer.head.updateWorldMatrix(true, false);
+    killer.head.getWorldPosition(target);
+    return target;
+  }
+  const p = killer.root.position;
+  const scale = killer.scale || 1;
+  const y = killer.wings ? p.y + 0.35 : p.y + (killer.isBoss ? 2.35 : 1.35) * scale;
+  target.set(p.x, y, p.z);
+  return target;
+}
+
+function lookAnglesTo(target) {
+  const dx = target.x - camera.position.x;
+  const dy = target.y - camera.position.y;
+  const dz = target.z - camera.position.z;
+  const horiz = Math.hypot(dx, dz);
+  const targetYaw = Math.atan2(-dx, -dz);
+  const lim = Math.PI / 2 - 0.08;
+  const targetPitch = Math.max(-lim, Math.min(lim, Math.atan2(dy, Math.max(0.001, horiz))));
+  return { yaw: targetYaw, pitch: targetPitch };
+}
+
+function startDeathLook(killer) {
+  deathLook = null;
+  if (!killer || !killer.root) return;
+  deathLook = {
+    killer,
+    startYaw: yaw,
+    startPitch: pitch,
+    startAt: performance.now(),
+    duration: DEATH_LOOK_DURATION,
+  };
+}
+
+function updateDeathLook() {
+  if (state !== "dead" || !deathLook || !deathLook.killer) return;
+  const head = killerHeadPosition(deathLook.killer, _deathHead);
+  if (!head) return;
+  const target = lookAnglesTo(head);
+  const elapsed = (performance.now() - deathLook.startAt) / 1000;
+  const t = Math.min(1, elapsed / deathLook.duration);
+  const s = t * t * (3 - 2 * t);
+  _deathE0.set(deathLook.startPitch, deathLook.startYaw, 0, "YXZ");
+  _deathE1.set(target.pitch, target.yaw, 0, "YXZ");
+  _deathQ0.setFromEuler(_deathE0);
+  _deathQ1.setFromEuler(_deathE1);
+  _deathQ.slerpQuaternions(_deathQ0, _deathQ1, s);
+  const e = _deathE0.setFromQuaternion(_deathQ, "YXZ");
+  yaw = e.y;
+  pitch = e.x;
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+  camera.rotation.z = 0;
+}
+
 function startBloodDrip() {
+
   if (bloodAnim) cancelAnimationFrame(bloodAnim);
   const w = bloodCanvas.width = window.innerWidth;
   const h = bloodCanvas.height = window.innerHeight;
@@ -4821,11 +4910,11 @@ function takeHit(cause, attacker) {
   }
   hearts = 0;
   updateHeartsHUD();
-  onDeath(cause);
+  onDeath(cause, attacker);
   return false;
 }
 
-function onDeath(cause) {
+function onDeath(cause, killer) {
   if (state === "dead" || state === "victory") return;
   state = "dead";
   turretGhost.root.visible = false;
@@ -4847,7 +4936,11 @@ function onDeath(cause) {
   }
   deathCoinsEl.textContent = String(coinsCollected);
   if (deathDinosEl) deathDinosEl.textContent = String(dinosDefeated);
-  if (document.exitPointerLock) document.exitPointerLock();
+  if (typeof clearTouchPointers === "function") clearTouchPointers();
+  try {
+    if (document.exitPointerLock) document.exitPointerLock();
+  } catch (err) { /* already unlocked, or this document can't hold a pointer lock */ }
+  startDeathLook(killer);
   startBloodDrip();
 }
 
@@ -4866,6 +4959,7 @@ function onVictory() {
 }
 
 function resetGame() {
+  deathLook = null;
   if (bloodAnim) cancelAnimationFrame(bloodAnim);
   bloodAnim = null;
   bloodOverlay.classList.add("hidden");
@@ -4917,16 +5011,8 @@ function resetGame() {
   for (const p of particles) scene.remove(p.mesh);
   particles.length = 0;
 
-  for (const crate of crates) {
-    if (!crate.alive) {
-      scene.add(crate.mesh);
-      crate.alive = true;
-      if (!colliders.includes(crate.col)) colliders.push(crate.col);
-    }
-    crate.respawnAt = 0;
-  }
-  // spawn extras if some were never placed? keep existing set
-  while (crates.filter((c) => c.alive).length < 22) spawnCrate();
+  clearAllCrates();
+  for (let i = 0; i < 22; i++) spawnCrate();
 
   for (const d of dinos) {
     if (d.root.parent) scene.remove(d.root);
@@ -5188,6 +5274,7 @@ function isUiControl(target) {
 }
 
 function applyLookDelta(dx, dy) {
+  if (state !== "playing") return;
   const mag = Math.hypot(dx, dy);
   const accel = 1 + LOOK_ACCEL * Math.min(1, Math.max(0, (mag - 6) / 48));
   yaw -= dx * LOOK_SENS * accel;
@@ -5692,10 +5779,11 @@ function pickWander(d) {
 }
 
 function updateDinos(dt) {
-  if (state === "dead" || state === "victory") return;
+  if (state === "victory") return;
   const px = camera.position.x;
   const pz = camera.position.z;
   const playing = state === "playing";
+  const allowMove = playing || state === "dead";
 
   for (const d of dinos) {
     if (!d.alive) continue;
@@ -5731,7 +5819,7 @@ function updateDinos(dt) {
       d.kbZ *= Math.max(0, 1 - 8 * dt);
     }
 
-    if (playing && !staggered && !shopSafe) {
+    if (allowMove && !staggered && !shopSafe) {
       if (d.mode === "wander") {
         const seen = pickBestTarget(d, true);
         if (seen) {
@@ -5974,6 +6062,7 @@ function animate() {
   updateShopkeeper(dt);
   updateDinos(dt);
   updatePteras(dt);
+  updateDeathLook();
   updateThreatBar();
   renderer.render(scene, camera);
 }
@@ -6075,8 +6164,18 @@ window.__dinoWand = {
   get difficulty() { return difficulty; },
   setDifficulty,
   isSolidAt,
+  houses,
+  trees,
   dinoTakeCoin,
+  clearAllCrates,
+  spawnCrate,
   threatAngleToX,
+  killerHeadPosition,
+  lookAnglesTo,
+  startDeathLook,
+  updateDeathLook,
+  get deathLook() { return deathLook; },
+  DEATH_LOOK_DURATION,
   signedThreatAngle,
   updateThreatBar,
   collectThreats,
